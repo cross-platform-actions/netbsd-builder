@@ -187,6 +187,11 @@ source "qemu" "qemu" {
     "a<enter><wait5>", // Are they OK, Yes
     "a<enter><wait5>", // Is the network information correct, Yes
 
+    // Enable installation of binary packages
+    "e<enter><wait5>",
+    "x<enter><wait2m>",
+    "<enter><wait5>", // Hit enter to continue
+
     "x<enter><wait5>", // Finished configuring
     "<enter><wait5>", // Hit enter to continue
 
@@ -195,8 +200,6 @@ source "qemu" "qemu" {
     "a<enter><wait5>", // Run /bin/sh
 
     // shell
-    "IF=`ifconfig | head -1 | awk -F':' '{print $1}'`<enter><wait>",
-    "/sbin/dhcpcd -d -n $IF<enter><wait10>",
     "ftp -o /tmp/post_install.sh http://{{.HTTPIP}}:{{.HTTPPort}}/resources/post_install.sh<enter><wait10>",
     "sh /tmp/post_install.sh && exit<enter><wait5>",
 

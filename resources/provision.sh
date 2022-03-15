@@ -7,17 +7,8 @@ setup_path() {
   export PATH
 }
 
-setup_binary_packages() {
-  arch="$(uname -m)"
-  version="$(uname -r)"
-  PKG_PATH="https://cdn.NetBSD.org/pub/pkgsrc/packages/NetBSD/$arch/$version/All"
-  export PKG_PATH
-  echo "PKG_PATH='$PKG_PATH'" >> /etc/profile
-  echo "export PKG_PATH" >> /etc/profile
-}
-
 install_extra_packages() {
-  pkg_add -v bash curl pkgin rsync sudo
+  pkgin -y install bash curl rsync sudo
 }
 
 setup_sudo() {
@@ -76,7 +67,6 @@ minimize_swap() {
 }
 
 setup_path
-setup_binary_packages
 install_extra_packages
 setup_sudo
 configure_boot_flags
