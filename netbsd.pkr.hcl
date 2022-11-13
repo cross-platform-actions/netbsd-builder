@@ -237,6 +237,15 @@ source "qemu" "qemu" {
   vm_name = local.vm_name
 }
 
+packer {
+  required_plugins {
+    qemu = {
+      version = "~> 1.0.8"
+      source = "github.com/hashicorp/qemu"
+    }
+  }
+}
+
 build {
   sources = ["qemu.qemu"]
 

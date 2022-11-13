@@ -7,6 +7,8 @@ ARCHITECTURE="$1"; shift
 
 # rm -rf packer_cache
 
+packer init .
+
 packer build \
   -var-file "var_files/common.pkrvars.hcl" \
   -var-file "var_files/$ARCHITECTURE.pkrvars.hcl" \
