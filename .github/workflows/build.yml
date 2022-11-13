@@ -1,5 +1,8 @@
 name: Build VM Disk Image
 
+env:
+  PACKER_VERSION: '1.8.4'
+
 on:
   push:
     branches: '*'
@@ -33,7 +36,7 @@ jobs:
 
       - name: Install Packer
         run: |
-          curl -o packer.zip -L https://releases.hashicorp.com/packer/1.7.2/packer_1.7.2_linux_amd64.zip
+          curl -o packer.zip -L https://releases.hashicorp.com/packer/${{ env.PACKER_VERSION }}/packer_${{ env.PACKER_VERSION }}_linux_amd64.zip
           unzip packer.zip
           mv packer /usr/local/bin
 
