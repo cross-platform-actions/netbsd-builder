@@ -131,80 +131,80 @@ source "qemu" "qemu" {
 
   boot_wait = "1m"
 
-  boot_command = [
-    "a<enter><wait5>", // Installation messages in English
-    "a<enter><wait5>", // Keyboard type: unchanged
+  boot_steps = [
+    ["a<enter><wait5>", "Installation messages in English"],
+    ["a<enter><wait5>", "Keyboard type: unchanged"],
 
-    "a<enter><wait5>", // Install NetBSD to hard disk
-    "b<enter><wait5>", // Yes
+    ["a<enter><wait5>", "Install NetBSD to hard disk"],
+    ["b<enter><wait5>", "Yes"],
 
-    "a<enter><wait5>", // Available disks: sd0
-    "a<enter><wait5>", // Guid Partition Table
-    "a<enter><wait5>", // This is the correct geometry
-    "b<enter><wait5>", // Use default partition sizes
-    "x<enter><wait5>", // Partition sizes ok
-    "b<enter><wait10>", // Yes
+    ["a<enter><wait5>", "Available disks: sd0"],
+    ["a<enter><wait5>", "Guid Partition Table"],
+    ["a<enter><wait5>", "This is the correct geometry"],
+    ["b<enter><wait5>", "Use default partition sizes"],
+    ["x<enter><wait5>", "Partition sizes ok"],
+    ["b<enter><wait10>", "Yes"],
 
-    "a<enter><wait>", // Bootblocks selection: Use BIOS console
+    ["a<enter><wait>", "Bootblocks selection: Use BIOS console"],
 
-    "d<enter><wait>", // Custom installation
+    ["d<enter><wait>", "Custom installation"],
     // Distribution set:
-    "f<enter><wait5>", // Compiler tools
-    "x<enter><wait5>", // Install selected sets
+    ["f<enter><wait5>", "Compiler tools"],
+    ["x<enter><wait5>", "Install selected sets"],
 
-    "a<enter><wait4m>", // Install from: install image media
+    ["a<enter><wait4m>", "Install from: install image media"],
 
-    "<enter><wait5>", // Hit enter to continue
+    ["<enter><wait5>", "Hit enter to continue"],
 
     // Configure the additional items as needed
 
     // Change root password
-    "d<enter><wait5>",
-    "a<enter><wait5>", // Yes
-    "${var.root_password}<enter><wait5>", // New password
-    "${var.root_password}<enter><wait5>", // New password
-    "${var.root_password}<enter><wait5>", // Retype new password
+    ["d<enter><wait5>"],
+    ["a<enter><wait5>", "Yes"],
+    ["${var.root_password}<enter><wait5>", "New password"],
+    ["${var.root_password}<enter><wait5>", "New password"],
+    ["${var.root_password}<enter><wait5>", "Retype new password"],
 
     // Add a user
-    "o<enter><wait5>",
-    "${var.secondary_user_username}<enter><wait5>", // username
-    "a<enter><wait5>", // Add user to group wheel, Yes
-    "a<enter><wait5>", // User shell, sh
-    "${var.secondary_user_password}<enter><wait5>", // New password
-    "${var.secondary_user_password}<enter><wait5>", // New password
-    "${var.secondary_user_password}<enter><wait5>", // New password
+    ["o<enter><wait5>"],
+    ["${var.secondary_user_username}<enter><wait5>", "username"],
+    ["a<enter><wait5>", "Add user to group wheel, Yes"],
+    ["a<enter><wait5>", "User shell, sh"],
+    ["${var.secondary_user_password}<enter><wait5>", "New password"],
+    ["${var.secondary_user_password}<enter><wait5>", "New password"],
+    ["${var.secondary_user_password}<enter><wait5>", "New password"],
 
-    "g<enter><wait5>", // Enable sshd
-    "h<enter><wait5>", // Enable ntpd
-    "i<enter><wait5>", // Run ntpdate at boot
+    ["g<enter><wait5>", "Enable sshd"],
+    ["h<enter><wait5>", "Enable ntpd"],
+    ["i<enter><wait5>", "Run ntpdate at boot"],
 
     // Configure network
-    "a<enter><wait5>",
-    "a<enter><wait5>", // first interface
-    "<enter><wait5>", // Network media type
-    "a<enter><wait20>", // Perform autoconfiguration, Yes
-    "<enter><wait5>", // Your DNS domain
-    "a<enter><wait5>", // Are they OK, Yes
-    "a<enter><wait5>", // Is the network information correct, Yes
+    ["a<enter><wait5>"],
+    ["a<enter><wait5>", "first interface"],
+    ["<enter><wait5>", "Network media type"],
+    ["a<enter><wait20>", "Perform autoconfiguration, Yes"],
+    ["<enter><wait5>", "Your DNS domain"],
+    ["a<enter><wait5>", "Are they OK, Yes"],
+    ["a<enter><wait5>", "Is the network information correct, Yes"],
 
     // Enable installation of binary packages
-    "e<enter><wait5>",
-    "x<enter><wait2m>",
-    "<enter><wait5>", // Hit enter to continue
+    ["e<enter><wait5>"],
+    ["x<enter><wait2m>", "Install pkgin and update package summary"],
+    ["<enter><wait5>", "Hit enter to continue"],
 
-    "x<enter><wait5>", // Finished configuring
-    "<enter><wait5>", // Hit enter to continue
+    ["x<enter><wait5>", "Finished configuring"],
+    ["<enter><wait5>", "Hit enter to continue"],
 
     // post install configuration
-    "e<enter><wait5>", // Utility menu
-    "a<enter><wait5>", // Run /bin/sh
+    ["e<enter><wait5>", "Utility menu"],
+    ["a<enter><wait5>", "Run /bin/sh"],
 
     // shell
-    "ftp -o /tmp/post_install.sh http://{{.HTTPIP}}:{{.HTTPPort}}/resources/post_install.sh<enter><wait10>",
-    "sh /tmp/post_install.sh && exit<enter><wait5>",
+    ["ftp -o /tmp/post_install.sh http://{{.HTTPIP}}:{{.HTTPPort}}/resources/post_install.sh<enter><wait10>"],
+    ["sh /tmp/post_install.sh && exit<enter><wait5>"],
 
-    "x<enter><wait5>", // Exit Utility menu
-    "d<enter>", // Reboot the computer
+    ["x<enter><wait5>", "Exit Utility menu"],
+    ["d<enter>", "Reboot the computer"],
   ]
 
   ssh_username = "root"
