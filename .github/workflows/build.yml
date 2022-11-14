@@ -15,7 +15,6 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    container: ubuntu:21.04
     strategy:
         matrix:
           version:
@@ -32,7 +31,7 @@ jobs:
           persist-credentials: false
 
       - name: Install Dependecies
-        run: apt update && apt install curl unzip "qemu-system-${{ matrix.architecture.name }}" -y
+        run: sudo apt update && sudo apt install curl unzip "qemu-system-${{ matrix.architecture.name }}" -y
 
       - name: Install Packer
         run: |
