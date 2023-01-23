@@ -150,6 +150,11 @@ source "qemu" "qemu" {
     ["d<enter><wait>", "Custom installation"],
     // Distribution set:
     ["f<enter><wait5>", "Compiler tools"],
+    ["m<enter><wait5>", "X11 sets"],
+    // X11 sets:
+    ["f<enter><wait5>", "Select all of the above sets"],
+    ["x<enter><wait5>", "Install selected sets"],
+    // Distribution set:
     ["x<enter><wait5>", "Install selected sets"],
 
     ["a<enter><wait4m>", "Install from: install image media"],

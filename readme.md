@@ -10,6 +10,11 @@ X components. It will install the following distribution sets:
 * Base
 * Configuration files
 * Compiler tools
+* X11 base and clients
+* X11 programming
+* X11 configuration
+* X11 fonts
+* X11 servers
 
 In addition to the above file sets, the following packages are installed as well:
 
