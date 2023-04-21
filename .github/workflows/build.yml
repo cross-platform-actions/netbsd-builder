@@ -30,18 +30,16 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install Dependecies
+      - name: Install Dependencies
         run: sudo apt update && sudo apt install curl unzip "qemu-system-${{ matrix.architecture.name }}" -y
 
-      - name: Install Packer
-        run: |
-          curl -o packer.zip -L https://releases.hashicorp.com/packer/${{ env.PACKER_VERSION }}/packer_${{ env.PACKER_VERSION }}_linux_amd64.zip
-          unzip packer.zip
-          mv packer /usr/local/bin
+      - uses: hashicorp/setup-packer@main
+        with:
+          version: ${{ env.PACKER_VERSION }}
 
       - name: Download QEMU UEFI
         if: matrix.architecture.name == 'arm64'
-        run: curl -o resources/qemu_efi.fd -L http://releases.linaro.org/components/kernel/uefi-linaro/latest/release/qemu64/QEMU_EFI.fd
+        run: curl -o resources/qemu_efi.fd -L https://releases.linaro.org/components/kernel/uefi-linaro/latest/release/qemu64/QEMU_EFI.fd
 
       # - name: Setup tmate session
       #   uses: mxschmitt/action-tmate@v3
