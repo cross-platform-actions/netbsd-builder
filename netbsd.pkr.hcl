@@ -92,16 +92,6 @@ variable "firmware" {
   description = "The firmware file to be used by QEMU"
 }
 
-variable "sudo_version" {
-  type = string
-  description = "The version of the sudo package to install"
-}
-
-variable "rsync_version" {
-  type = string
-  description = "The version of the rsync package to install"
-}
-
 locals {
   iso_target_extension = "iso"
   iso_target_path = "packer_cache"
