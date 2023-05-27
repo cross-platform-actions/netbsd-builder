@@ -19,6 +19,7 @@ jobs:
         matrix:
           version:
             - 9.2
+            - 9.3
 
           architecture:
             - name: x86-64
