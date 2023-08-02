@@ -53,24 +53,8 @@ install_authorized_keys
 EOF
 }
 
-minimize_disk() {
-  for dir in $(mount | awk '{ print $3 }'); do
-    dd if=/dev/zero of="$dir/EMPTY" bs=1048576 || :
-    rm -f "$dir/EMPTY"
-  done
-}
-
-minimize_swap() {
-  swap_device=$(swapctl -l | awk '!/^Device/ { print $1 }')
-  swapctl -d "$swap_device"
-  dd if=/dev/zero of="$swap_device" bs=1048576 || :
-}
-
 setup_path
 install_extra_packages
 setup_sudo
 configure_boot_flags
 configure_boot_scripts
-
-minimize_disk
-minimize_swap
