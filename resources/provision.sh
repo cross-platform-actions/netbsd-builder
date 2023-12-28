@@ -54,7 +54,7 @@ EOF
 }
 
 setup_path
-install_extra_packages
+# install_extra_packages
 setup_sudo
 configure_boot_flags
 configure_boot_scripts

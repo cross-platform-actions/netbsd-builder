@@ -20,6 +20,7 @@ jobs:
           version:
             - 9.2
             - 9.3
+            - 10.0_RC2
 
           architecture:
             - name: x86-64
