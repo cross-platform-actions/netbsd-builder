@@ -22,7 +22,11 @@ EOF
 }
 
 configure_boot_flags() {
-  sed -i -E 's/timeout=.+/timeout=0/' /boot.cfg
+  if [ -f /boot.cfg ]; then
+    sed -i -E 's/timeout=.+/timeout=0/' /boot.cfg
+  else
+    echo 'timeout=0' > /boot.cfg
+  fi
 }
 
 configure_boot_scripts() {

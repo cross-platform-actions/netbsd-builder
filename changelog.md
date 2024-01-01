@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 - Added support for NetBSD 10.0
+- Added support for NetBSD ARM64
 
 ## [0.2.0] - 2023-05-28
 ### Added

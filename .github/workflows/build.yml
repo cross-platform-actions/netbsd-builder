@@ -13,8 +13,9 @@ on:
 
 jobs:
   build:
-    name: Build
+    name: ${{ matrix.version }}, ${{ matrix.architecture.name }}
     runs-on: ubuntu-latest
+    container: alpine:edge
     strategy:
         matrix:
           version:
@@ -24,7 +25,21 @@ jobs:
 
           architecture:
             - name: x86-64
-              qemu: x86
+              qemu: x86_64
+
+            - name: arm64
+              qemu: aarch64
+
+          exclude:
+            - version: 9.2
+              architecture:
+                name: arm64
+                qemu: aarch64
+
+            - version: 9.3
+              architecture:
+                name: arm64
+                qemu: aarch64
 
     steps:
       - name: Clone Repository
@@ -33,15 +48,12 @@ jobs:
           persist-credentials: false
 
       - name: Install Dependencies
-        run: sudo apt update && sudo apt install curl unzip "qemu-system-${{ matrix.architecture.name }}" -y
+        # run: sudo apt update && sudo apt install curl unzip "qemu-system-${{ matrix.architecture.qemu }}" -y
+        run: apk add --no-cache qemu-img "qemu-system-${{ matrix.architecture.qemu }}"
 
       - uses: hashicorp/setup-packer@main
         with:
           version: ${{ env.PACKER_VERSION }}
-
-      - name: Download QEMU UEFI
-        if: matrix.architecture.name == 'arm64'
-        run: curl -o resources/qemu_efi.fd -L https://releases.linaro.org/components/kernel/uefi-linaro/latest/release/qemu64/QEMU_EFI.fd
 
       # - name: Setup tmate session
       #   uses: mxschmitt/action-tmate@v3
