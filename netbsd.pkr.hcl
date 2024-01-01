@@ -114,6 +114,26 @@ variable "hostname_step" {
   description = "Step to set hostname"
 }
 
+variable "keyboard_layout_steps" {
+  type = list(list(string))
+  description = "Step to select keyboard layout"
+}
+
+variable "correct_geometry_steps" {
+  type = list(list(string))
+  description = "Step to say the geometry is correct"
+}
+
+variable "bootblock_selection_steps" {
+  type = list(list(string))
+  description = "Step to select bootblock"
+}
+
+variable "post_install_disk_device" {
+  type = string
+  description = "The disk device to mount during post install"
+}
+
 locals {
   iso_target_extension = "iso"
   iso_target_path = "packer_cache"
@@ -139,27 +159,37 @@ source "qemu" "qemu" {
   display = var.display
   accelerator = var.accelerator
   qemu_binary = "qemu-system-${var.architecture.qemu}"
-  // firmware = var.firmware
+  firmware = var.firmware
 
   boot_wait = "10s"
 
   boot_steps = concat(
     [
-      ["a<enter><wait5>", "Installation messages in English"],
-      ["a<enter><wait5>", "Keyboard type: unchanged"],
+      ["1<wait20s>", "Boot normally"], // for x86-64, the boot delay is already over
+      ["a<enter><wait5>", "Installation messages in English"]
+    ],
 
+    var.keyboard_layout_steps,
+
+    [
       ["a<enter><wait5>", "Install NetBSD to hard disk"],
       ["b<enter><wait5>", "Yes"],
 
       ["a<enter><wait5>", "Available disks: sd0"],
       ["a<enter><wait5>", "Guid Partition Table"],
-      ["a<enter><wait5>", "This is the correct geometry"],
+    ],
+
+    var.correct_geometry_steps,
+
+    [
       ["b<enter><wait5>", "Use default partition sizes"],
       ["x<enter><wait5>", "Partition sizes ok"],
       ["b<enter><wait10>", "Yes"],
+    ],
 
-      ["a<enter><wait>", "Bootblocks selection: Use BIOS console"],
+    var.bootblock_selection_steps,
 
+    [
       ["d<enter><wait>", "Custom installation"],
       // Distribution set:
       ["f<enter><wait5>", "Compiler tools"],
@@ -170,7 +200,7 @@ source "qemu" "qemu" {
       // Distribution set:
       ["x<enter><wait5>", "Install selected sets"],
 
-      ["a<enter><wait4m>", "Install from: install image media"],
+      ["a<enter><wait5m>", "Install from: install image media"],
 
       ["<enter><wait5>", "Hit enter to continue"],
 
@@ -181,7 +211,6 @@ source "qemu" "qemu" {
 
     [
       // Change root password
-      flatten(var.root_password_pre_steps),
       ["${var.root_password}<enter><wait5>", "New password"],
       ["${var.root_password}<enter><wait5>", "New password"],
       ["${var.root_password}<enter><wait5>", "Retype new password"],
@@ -217,10 +246,10 @@ source "qemu" "qemu" {
       ["a<enter><wait5>", "Are they OK, Yes"],
       ["a<enter><wait5>", "Is the network information correct, Yes"],
 
-      // Enable installation of binary packages
-      /*["e<enter><wait5>"],
-      ["x<enter><wait2m>", "Install pkgin and update package summary"],
-      ["<enter><wait5>", "Hit enter to continue"],*/
+      // // Enable installation of binary packages
+      // ["e<enter><wait5>"],
+      // ["x<enter><wait2m>", "Install pkgin and update package summary"],
+      // ["<enter><wait5>", "Hit enter to continue"],
 
       ["x<enter><wait5>", "Finished configuring"],
       ["<enter><wait5>", "Hit enter to continue"],
@@ -231,7 +260,7 @@ source "qemu" "qemu" {
 
       // shell
       ["ftp -o /tmp/post_install.sh http://{{.HTTPIP}}:{{.HTTPPort}}/resources/post_install.sh<enter><wait10>"],
-      ["sh /tmp/post_install.sh && exit<enter><wait5>"],
+      ["DISK_DEVICE='${var.post_install_disk_device}' sh /tmp/post_install.sh && exit<enter><wait5>"],
 
       ["x<enter><wait5>", "Exit Utility menu"],
       ["d<enter>", "Reboot the computer"],
@@ -251,7 +280,6 @@ source "qemu" "qemu" {
     ["-device", "scsi-cd,drive=drive1,bootindex=1"],
     ["-drive", "if=none,file={{ .OutputDir }}/{{ .Name }},id=drive0,cache=writeback,discard=ignore,format=qcow2"],
     ["-drive", "if=none,file=${local.iso_full_target_path},id=drive1,media=disk,format=raw,readonly=on"],
-    ["-serial", "stdio"],
     ["-netdev", "user,id=user.0,hostfwd=tcp::{{ .SSHHostPort }}-:22,ipv6=off"]
   ]
 

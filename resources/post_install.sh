@@ -4,7 +4,7 @@ set -eux
 set -o pipefail
 
 configure_ssh() {
-  tee -a /mnt/etc/ssh/sshd_config <<EOF
+  cat <<EOF >> /mnt/etc/ssh/sshd_config
 PermitRootLogin yes
 PasswordAuthentication yes
 PubkeyAuthentication yes
@@ -14,5 +14,5 @@ EOF
 }
 
 dkctl sd0 makewedges
-mount /dev/dk0 /mnt
+mount "$DISK_DEVICE" /mnt
 configure_ssh
