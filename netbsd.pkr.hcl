@@ -146,6 +146,7 @@ locals {
 
   image = "NetBSD-${var.os_version}-${var.architecture.image}.${local.iso_target_extension}"
   vm_name = "netbsd-${var.os_version}-${var.architecture.name}.qcow2"
+  full_remote_path = "images/${var.os_version}/${local.image}"
 }
 
 source "qemu" "qemu" {
@@ -297,7 +298,14 @@ source "qemu" "qemu" {
   iso_target_extension = local.iso_target_extension
   iso_target_path = local.iso_target_path
   iso_urls = [
-    "https://cdn.netbsd.org/pub/NetBSD/images/${var.os_version}/${local.image}"
+    "https://cdn.netbsd.org/pub/NetBSD/${local.full_remote_path}",
+    "https://ftp.netbsd.org/pub/NetBSD/${local.full_remote_path}",
+    "https://mirror.planetunix.net/pub/NetBSD/${local.full_remote_path}",
+    "https://www.nic.funet.fi/pub/NetBSD/${local.full_remote_path}",
+    "https://www.nic.funet.fi/pub/NetBSD/${local.full_remote_path}",
+    "https://ftp.uni-erlangen.de/netbsd/${local.full_remote_path}",
+    "https://ftp.allbsd.org/NetBSD/${local.full_remote_path}",
+    "https://ftp.kaist.ac.kr/NetBSD/${local.full_remote_path}"
   ]
 
   http_directory = "."
