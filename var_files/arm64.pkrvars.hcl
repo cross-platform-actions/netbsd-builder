@@ -1,7 +1,8 @@
-machine_type = "virt"
+machine_type = "virt,highmem=off" // highmem=off if reqiured for enabling hardware acceleration on Apple Silicon
 cpu_type = "cortex-a57"
 firmware = "edk2-aarch64-code.fd"
 post_install_disk_device = "/dev/dk1"
+memory = 3072 // max memory when hardware acceleration on Apple Silicon is enabled
 
 architecture = {
   name = "arm64"
