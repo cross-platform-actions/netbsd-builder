@@ -250,7 +250,7 @@ source "qemu" "qemu" {
     [
       ["<enter><wait5>", "Your DNS domain"],
       ["a<enter><wait5>", "Are they OK, Yes"],
-      ["a<enter><wait5>", "Is the network information correct, Yes"],
+      ["a<enter><wait5>", "Is the network information accurate. Install in /etc? Yes"],
 
       // Enable installation of binary packages
       ["e<enter><wait5>"]
