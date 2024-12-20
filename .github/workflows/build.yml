@@ -25,6 +25,7 @@ jobs:
             - 9.3
             - 9.4
             - '10.0'
+            - '10.1'
 
           architecture:
             - name: x86-64
