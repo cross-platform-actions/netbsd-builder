@@ -32,9 +32,12 @@ allowed use `sudo` without a password.
 
 The following architectures and versions are supported:
 
-| Version | x86-64 |
-|---------|--------|
-| 9.2     | ✓      |
+| Version | x86-64 | ARM64 |
+|---------|--------|-------|
+| 10.0    | ✓      | ✓     |
+| 9.4     | ✓      | ✗     |
+| 9.3     | ✓      | ✗     |
+| 9.2     | ✓      | ✗     |
 
 ## Building Locally
 
