@@ -259,6 +259,7 @@ source "qemu" "qemu" {
     var.pkgin_network_information_step,
 
     [
+      ["i<enter><wait5>", "Download via http -> ftp"],
       ["x<enter><wait2m>", "Install pkgin and update package summary"],
       ["<enter><wait5>", "Hit enter to continue"],
 
