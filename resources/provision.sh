@@ -57,8 +57,13 @@ install_authorized_keys
 EOF
 }
 
+set_hostname() {
+  echo 'hostname=runnervmg1sw1.local' >> /etc/rc.conf
+}
+
 setup_path
 install_extra_packages
 setup_sudo
 configure_boot_flags
 configure_boot_scripts
+set_hostname

@@ -123,7 +123,7 @@ jobs:
             [ "`uname -r`" = '${{ matrix.version }}' ]
             [ "`uname -m`" = '${{ matrix.architecture.uname || matrix.architecture.name }}' ] || [ "`uname -p`" = '${{ matrix.architecture.uname || matrix.architecture.name }}' ]
             [ "`pwd`" = '/home/runner/work/netbsd-builder/netbsd-builder' ]
-            [ "`hostname -f`" = 'runnervmg1sw1.local' ]
+            [ "`hostname`" = 'runnervmg1sw1.local' ]
             cat host_to_guest.txt | grep -q 'host to guest'
             echo 'guest to host' > guest_to_host.txt
 
