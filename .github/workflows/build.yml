@@ -17,7 +17,6 @@ jobs:
   build:
     name: ${{ matrix.version }}, ${{ matrix.architecture.name }}
     runs-on: ubuntu-latest
-    container: alpine:edge
     strategy:
         matrix:
           version:
@@ -29,10 +28,13 @@ jobs:
 
           architecture:
             - name: x86-64
-              qemu: x86_64
+              qemu: x86
+              qemu_executable: x86_64
+              uname: amd64
 
             - name: arm64
               qemu: aarch64
+              uname: aarch64
 
           exclude:
             - version: 9.2
@@ -57,8 +59,22 @@ jobs:
           persist-credentials: false
 
       - name: Install Dependencies
-        # run: sudo apt update && sudo apt install curl unzip "qemu-system-${{ matrix.architecture.qemu }}" -y
-        run: apk add --no-cache qemu-img "qemu-system-${{ matrix.architecture.qemu }}"
+        run: |
+          sudo apt update && \
+          sudo apt install -y \
+          fdisk \
+          dosfstools \
+          rsync \
+          curl \
+          python3 \
+          qemu-system-${{ matrix.architecture.qemu }}
+
+          if [ -f /usr/share/qemu-efi-aarch64/QEMU_EFI.fd ]; then
+            sudo ln -s /usr/share/qemu-efi-aarch64/QEMU_EFI.fd /usr/share/qemu/edk2-aarch64-code.fd
+          fi
+
+      - name: Print QEMU version
+        run: '"qemu-system-${{ matrix.architecture.qemu_executable || matrix.architecture.qemu }}" --version'
 
       - uses: hashicorp/setup-packer@main
         with:
@@ -73,6 +89,46 @@ jobs:
             '${{ matrix.version }}' \
             '${{ matrix.architecture.name }}' \
             -var 'headless=true'
+
+      - name: Start Local HTTP Server
+        run: python3 -m http.server 8080 --directory output &
+
+      - name: Create File
+        run: echo 'host to guest' > host_to_guest.txt
+
+      - name: Test Image
+        uses: cross-platform-actions/action@master
+        with:
+          operating_system: netbsd
+          architecture: ${{ matrix.architecture.name }}
+          version: '${{ matrix.version }}'
+          image_url: http://localhost:8080/netbsd-${{ matrix.version }}-${{ matrix.architecture.name }}.qcow2
+          shutdown_vm: false
+          shell: bash
+          run: |
+            set -x
+            printf 'uname -a: '; uname -a
+            printf 'uname -s: '; uname -s
+            printf 'uname -r: '; uname -r
+            printf 'uname -v: '; uname -v
+            printf 'uname -m: '; uname -m
+            printf 'uname -p: '; uname -p
+            printf 'pwd: '; pwd
+            printf 'echo $SHELL: '; echo $SHELL
+            printf 'whoami: '; whoami
+            printf 'hostname: '; hostname
+            echo 'ls -lah:'; ls -lah
+            echo 'env | sort:'; env | sort
+            [ "`uname -s`" = 'NetBSD' ]
+            [ "`uname -r`" = '${{ matrix.version }}' ]
+            [ "`uname -m`" = '${{ matrix.architecture.uname || matrix.architecture.name }}' ] || [ "`uname -p`" = '${{ matrix.architecture.uname || matrix.architecture.name }}' ]
+            [ "`pwd`" = '/home/runner/work/netbsd-builder/netbsd-builder' ]
+            [ "`hostname -f`" = 'runnervmg1sw1.local' ]
+            cat host_to_guest.txt | grep -q 'host to guest'
+            echo 'guest to host' > guest_to_host.txt
+
+      - name: Verify File Synchronization
+        run: cat guest_to_host.txt | grep -q 'guest to host'
 
       - name: Extract Version
         id: version
