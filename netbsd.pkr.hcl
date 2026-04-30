@@ -303,6 +303,7 @@ source "qemu" "qemu" {
   iso_target_path = local.iso_target_path
   iso_urls = [
     "https://cdn.netbsd.org/pub/NetBSD/${local.full_remote_path}",
+    "https://archive.netbsd.org/pub/NetBSD-archive/${local.full_remote_path}",
     "https://ftp.netbsd.org/pub/NetBSD/${local.full_remote_path}",
     "https://mirror.planetunix.net/pub/NetBSD/${local.full_remote_path}",
     "https://www.nic.funet.fi/pub/NetBSD/${local.full_remote_path}",
