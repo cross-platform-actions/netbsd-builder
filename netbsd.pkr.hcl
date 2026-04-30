@@ -146,7 +146,7 @@ locals {
 
   image = "NetBSD-${var.os_version}-${var.architecture.image}.${local.iso_target_extension}"
   vm_name = "netbsd-${var.os_version}-${var.architecture.name}.qcow2"
-  full_remote_path = "images/${var.os_version}/${local.image}"
+  full_remote_path = "images/${var.os_version}/${local.image}?key=NetBSD"
 }
 
 source "qemu" "qemu" {
