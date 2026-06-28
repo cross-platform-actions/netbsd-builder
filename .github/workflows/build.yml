@@ -2,6 +2,7 @@ name: Build VM Disk Image
 
 env:
   PACKER_VERSION: '1.8.4'
+  SIMH_VERSION: 'v0.0.1'
 
 on:
   push:
@@ -36,6 +37,14 @@ jobs:
               qemu: aarch64
               uname: aarch64
 
+          # NetBSD/VAX is built by the SIMH plugin, not qemu, and only
+          # 10.1 has a vax var file — add it as a single extra job.
+          include:
+            - version: '10.1'
+              architecture:
+                name: vax
+                uname: vax
+
           exclude:
             - version: 9.2
               architecture:
@@ -60,20 +69,30 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          sudo apt update && \
-          sudo apt install -y \
-          fdisk \
-          dosfstools \
-          rsync \
-          curl \
-          python3 \
-          qemu-system-${{ matrix.architecture.qemu }}
+          sudo apt update
+          sudo apt install -y fdisk dosfstools rsync curl python3
 
-          if [ -f /usr/share/qemu-efi-aarch64/QEMU_EFI.fd ]; then
-            sudo ln -s /usr/share/qemu-efi-aarch64/QEMU_EFI.fd /usr/share/qemu/edk2-aarch64-code.fd
+          # qemu only for the qemu-backed architectures; vax uses SIMH.
+          if [ -n '${{ matrix.architecture.qemu }}' ]; then
+            sudo apt install -y qemu-system-${{ matrix.architecture.qemu }}
+
+            if [ -f /usr/share/qemu-efi-aarch64/QEMU_EFI.fd ]; then
+              sudo ln -s /usr/share/qemu-efi-aarch64/QEMU_EFI.fd /usr/share/qemu/edk2-aarch64-code.fd
+            fi
           fi
 
+      # The SIMH VAX simulator the plugin drives. The build runs on
+      # x86-64 Linux runners. Locally, assume `vax` is already on PATH.
+      - name: Install SIMH (vax)
+        if: matrix.architecture.name == 'vax'
+        run: |
+          curl -sSfL -o /tmp/vax.tar \
+            "https://github.com/cross-platform-actions/simh-builder/releases/download/${SIMH_VERSION}/vax-linux-x86-64.tar"
+          sudo tar -xf /tmp/vax.tar -C /usr/local/bin vax
+          command -v vax
+
       - name: Print QEMU version
+        if: matrix.architecture.name != 'vax'
         run: '"qemu-system-${{ matrix.architecture.qemu_executable || matrix.architecture.qemu }}" --version'
 
       - uses: hashicorp/setup-packer@main
@@ -85,18 +104,29 @@ jobs:
 
       - name: Build Image
         run: |
+          # headless is a qemu-template variable; the vax template
+          # doesn't declare it, and passing an undeclared -var is a hard
+          # error, so only pass it for the qemu architectures.
+          extra_args=""
+          if [ '${{ matrix.architecture.name }}' != 'vax' ]; then
+            extra_args="-var headless=true"
+          fi
           PACKER_LOG=1 ./build.sh \
             '${{ matrix.version }}' \
             '${{ matrix.architecture.name }}' \
-            -var 'headless=true'
+            $extra_args
 
       - name: Start Local HTTP Server
+        if: matrix.architecture.name != 'vax'
         run: python3 -m http.server 8080 --directory output &
 
       - name: Create File
+        if: matrix.architecture.name != 'vax'
         run: echo 'host to guest' > host_to_guest.txt
 
+      # qemu architectures are booted by cross-platform-actions/action.
       - name: Test Image
+        if: matrix.architecture.name != 'vax'
         uses: cross-platform-actions/action@master
         with:
           operating_system: netbsd
@@ -128,7 +158,60 @@ jobs:
             echo 'guest to host' > guest_to_host.txt
 
       - name: Verify File Synchronization
+        if: matrix.architecture.name != 'vax'
         run: cat guest_to_host.txt | grep -q 'guest to host'
+
+      # cross-platform-actions/action is qemu-based and can't run a VAX
+      # image, so boot the built image under SIMH directly: decompress the
+      # distributed artifact to RAW (what a consumer does), autoboot the
+      # disk via EXPECT/SEND, wait for sshd, and run uname as the secondary
+      # user over password ssh — the credential the consumer logs in with.
+      - name: Test Image (vax)
+        if: matrix.architecture.name == 'vax'
+        run: |
+          set -eux
+          sudo apt-get install -y sshpass
+
+          zstd -dc "output/netbsd-${{ matrix.version }}-vax.img.zst" > disk.raw
+
+          # Autoboot the disk hands-free; forward host 2222 -> guest ssh.
+          {
+            echo "set cpu 64m"
+            echo "set rq0 ra92"
+            echo "attach rq0 disk.raw"
+            echo "attach xq nat:tcp=2222:10.0.2.15:22"
+            echo 'expect ">>>" send "boot dua0\r"; go'
+            echo "boot cpu"
+          } > test-vax.simh
+          vax test-vax.simh > vax-console.log 2>&1 &
+          simh_pid=$!
+
+          ssh_vax() {
+            sshpass -p runner ssh -p 2222 \
+              -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              -o PreferredAuthentications=password -o PubkeyAuthentication=no \
+              -o ConnectTimeout=5 runner@127.0.0.1 "$@"
+          }
+
+          # First boot generates ssh host keys, slow on an emulated VAX —
+          # poll for up to ~40 minutes (double-emulated local runs under
+          # act on ARM hosts need well over 20).
+          ok=
+          for _ in $(seq 1 120); do
+            if ssh_vax true 2>/dev/null; then ok=1; break; fi
+            sleep 20
+          done
+          if [ -z "$ok" ]; then
+            echo '=== vax console log ==='; cat vax-console.log || true
+            kill "$simh_pid" 2>/dev/null || true
+            exit 1
+          fi
+
+          uname_out=$(ssh_vax 'uname -sm')
+          echo "guest uname: $uname_out"
+          kill "$simh_pid" 2>/dev/null || true
+          echo "$uname_out" | grep -q NetBSD
+          echo "$uname_out" | grep -q vax
 
       - name: Create Release
         if: github.ref_type == 'tag'
@@ -138,11 +221,15 @@ jobs:
         run: |
           version="${github_ref_name#v}"
 
+          # Ship only the distributable image: the compressed RAW for vax
+          # (not the 1.5 GB raw .img or console logs), the qcow2 otherwise.
+          artifacts="${{ matrix.architecture.name == 'vax' && 'output/*.img.zst' || 'output/*.qcow2' }}"
+
           # Matrix jobs run in parallel; the first to arrive creates the
           # draft release, the rest upload their artifacts to it.
           # (gh release create with --draft does not deduplicate by tag.)
           if gh release view "$github_ref_name" >/dev/null 2>&1; then
-            gh release upload "$github_ref_name" output/* --clobber
+            gh release upload "$github_ref_name" $artifacts --clobber
           else
             sed -n "/^## \[${version}\]/,/^## \[/{/^## \[${version}\]/d;/^## \[/d;p;}" changelog.md \
               | gh release create \
@@ -150,5 +237,5 @@ jobs:
                 --title "NetBSD ${version}" \
                 --draft \
                 --notes-file - \
-                output/*
+                $artifacts
           fi
