@@ -186,11 +186,17 @@ jobs:
           vax test-vax.simh > vax-console.log 2>&1 &
           simh_pid=$!
 
+          # ConnectTimeout also bounds the SSH banner exchange (OpenSSH
+          # 8.4+), and the emulated VAX needs more than a few seconds to
+          # fork sshd and send its banner — 5s aborts every attempt on CI
+          # runners. Attempts while the port is still closed fail
+          # instantly via slirp's RST, so a long timeout doesn't slow the
+          # boot-wait polling down.
           ssh_vax() {
             sshpass -p runner ssh -p 2222 \
               -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
               -o PreferredAuthentications=password -o PubkeyAuthentication=no \
-              -o ConnectTimeout=5 runner@127.0.0.1 "$@"
+              -o ConnectTimeout=60 runner@127.0.0.1 "$@"
           }
 
           # First boot generates ssh host keys, slow on an emulated VAX —
