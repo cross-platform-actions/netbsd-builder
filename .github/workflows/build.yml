@@ -105,6 +105,10 @@ jobs:
       #   uses: mxschmitt/action-tmate@v3
 
       - name: Build Image
+        env:
+          # packer init resolves plugins via the GitHub API; anonymous
+          # requests share the runner IP's rate limit and get 403s.
+          PACKER_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # headless is a qemu-template variable; the vax template
           # doesn't declare it, and passing an undeclared -var is a hard
