@@ -3,7 +3,11 @@
 set -exu
 
 setup_path() {
-  PATH="/sbin:/usr/sbin:$PATH"
+  # /usr/pkg/bin and /usr/pkg/sbin are needed for pkgin/pkg_add. When this
+  # script runs inside the sysinst chroot (sparc64), the inherited PATH does
+  # not include them, so `pkgin` would not be found and, under `set -e`, the
+  # whole script would abort before configuring rc.local, sudo, etc.
+  PATH="/sbin:/usr/sbin:/usr/pkg/bin:/usr/pkg/sbin:$PATH"
   export PATH
 }
 
@@ -61,9 +65,21 @@ set_hostname() {
   echo 'hostname=runnervmg1sw1.local' >> /etc/rc.conf
 }
 
+# Bring up networking on boot. sysinst's network autoconfiguration does not
+# persist a DHCP config to the installed rc.conf on every install path
+# (notably sparc64), which leaves the VM with no address and sshd
+# unreachable. Only add one when no network config exists, so images that
+# are already configured are left untouched.
+configure_network() {
+  if ! grep -qE '^(dhcpcd=|ip4mode=|ifconfig_)' /etc/rc.conf; then
+    echo 'dhcpcd=YES' >> /etc/rc.conf
+  fi
+}
+
 setup_path
 install_extra_packages
 setup_sudo
 configure_boot_flags
 configure_boot_scripts
 set_hostname
+configure_network

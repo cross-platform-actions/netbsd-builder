@@ -7,7 +7,7 @@ ARCHITECTURE="$1"; shift
 
 # rm -rf packer_cache
 
-packer init .
+packer init netbsd.pkr.hcl || packer init .
 
 packer build \
   -var os_version="$OS_VERSION" \
