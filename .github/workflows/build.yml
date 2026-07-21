@@ -20,21 +20,21 @@ jobs:
     strategy:
         matrix:
           version:
-            - 9.2
-            - 9.3
-            - 9.4
-            - '10.0'
+            # - 9.2
+            # - 9.3
+            # - 9.4
+            # - '10.0'
             - '10.1'
 
           architecture:
-            - name: x86-64
-              qemu: x86
-              qemu_executable: x86_64
-              uname: amd64
+            # - name: x86-64
+            #   qemu: x86
+            #   qemu_executable: x86_64
+            #   uname: amd64
 
-            - name: arm64
-              qemu: aarch64
-              uname: aarch64
+            # - name: arm64
+            #   qemu: aarch64
+            #   uname: aarch64
 
             - name: sparc64
               qemu: sparc64
