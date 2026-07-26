@@ -68,5 +68,11 @@ at the path: `output/netbsd-9.2-x86-64.qcow2`.
 
 ## Additional Information
 
+The boot loader and the kernel of the x86-64 image use the first serial port,
+`com0`, as the console. That allows the boot output to be captured when the VM
+is running without a display, which is how the GitHub action runs it. The ARM64
+image uses the serial port by default, since the QEMU `virt` machine has no
+display device at all.
+
 The qcow2 format is chosen because unused space doesn't take up any space on
 disk, it's compressible and easily converts the raw format.

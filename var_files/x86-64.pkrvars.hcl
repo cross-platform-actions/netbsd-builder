@@ -1,5 +1,6 @@
 firmware = "bios-256k.bin"
 post_install_disk_device = "/dev/dk0"
+boot_console = "com0"
 
 architecture = {
   name = "x86-64"

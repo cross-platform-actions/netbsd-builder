@@ -139,6 +139,12 @@ variable "post_install_disk_device" {
   description = "The disk device to mount during post install"
 }
 
+variable "boot_console" {
+  default = ""
+  type = string
+  description = "The console device the boot loader and the kernel should use. An empty value leaves the platform default in place"
+}
+
 locals {
   iso_target_extension = "iso"
   iso_target_path = "packer_cache"
@@ -339,7 +345,8 @@ build {
   provisioner "shell" {
     script = "resources/provision.sh"
     environment_vars = [
-      "SECONDARY_USER=${var.secondary_user_username}"
+      "SECONDARY_USER=${var.secondary_user_username}",
+      "BOOT_CONSOLE=${var.boot_console}"
     ]
   }
 

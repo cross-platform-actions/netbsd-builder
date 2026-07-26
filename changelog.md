@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added support for NetBSD VAX via the SIMH simulator using packer-plugin-simh
 - Install bash, curl, pkgin, rsync and sudo on NetBSD/VAX from the [netbsd-pkg-repo](https://github.com/cross-platform-actions/netbsd-pkg-repo) release (the official mirrors carry no vax binaries)
 
+### Fixed
+- Enable the serial console on the x86-64 image, so the boot log is captured
+  when a VM fails to boot ([action#158](https://github.com/cross-platform-actions/action/issues/158))
+
 ## [0.6.0] - 2026-04-29
 ### Changed
 - Enable immutable releases ([action#140](https://github.com/cross-platform-actions/action/issues/140))

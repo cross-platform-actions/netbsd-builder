@@ -45,6 +45,22 @@ configure_boot_flags() {
   fi
 }
 
+# The action runs QEMU with `-display none -serial file:<log>` and prints that
+# log when a job fails. On the platforms where the boot loader and the kernel
+# write to the VGA framebuffer instead of the serial port, the log stays empty
+# and there's no way to tell why a VM failed to boot. Point the console at the
+# serial port so the boot output ends up in the log.
+# See https://github.com/cross-platform-actions/action/issues/158.
+configure_boot_console() {
+  [ -n "$BOOT_CONSOLE" ] || return 0
+
+  if grep -q '^consdev=' /boot.cfg; then
+    sed -i -E "s/^consdev=.+/consdev=$BOOT_CONSOLE/" /boot.cfg
+  else
+    echo "consdev=$BOOT_CONSOLE" >> /boot.cfg
+  fi
+}
+
 configure_boot_scripts() {
   cat <<EOF >> /etc/rc.local
 RESOURCES_MOUNT_PATH='/mnt/resources'
@@ -81,5 +97,6 @@ setup_path
 install_extra_packages
 setup_sudo
 configure_boot_flags
+configure_boot_console
 configure_boot_scripts
 set_hostname
