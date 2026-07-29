@@ -94,9 +94,14 @@ set_hostname() {
 }
 
 setup_path
-install_extra_packages
-setup_sudo
+
+# Configuration that only touches the file system, before anything that needs
+# the network. Nothing here depends on the packages, so it shouldn't be gated
+# behind a step that can fail because of a mirror.
 configure_boot_flags
 configure_boot_console
 configure_boot_scripts
 set_hostname
+
+install_extra_packages
+setup_sudo
