@@ -135,6 +135,34 @@ jobs:
             '${{ matrix.architecture.name }}' \
             $extra_args
 
+      # When the install goes wrong, packer only reports that it gave up
+      # waiting for SSH. The guest console says what actually happened.
+      # Only the qemu template captures a console log; the vax template is
+      # driven by the SIMH plugin, which writes none.
+      #
+      # Expect real content only for ARM64, whose console is the serial port:
+      # it logs the whole install, from the UEFI firmware to `login:`. On
+      # x86-64 the console is the display instead, and the single boot from
+      # disk during a build happens before provision.sh sets `consdev`, so
+      # nothing is written to the serial port and the log holds just QEMU's
+      # own one-line virtual console banner. That is not a broken capture.
+      - name: Print the guest console log
+        if: failure() && matrix.architecture.name != 'vax'
+        run: |
+          if [ -f console.log ]; then
+            cat console.log
+          else
+            echo 'No console log was produced at console.log'
+          fi
+
+      - name: Upload the guest console log
+        if: failure() && matrix.architecture.name != 'vax'
+        uses: actions/upload-artifact@v4
+        with:
+          name: console-${{ matrix.version }}-${{ matrix.architecture.name }}
+          path: console.log
+          if-no-files-found: warn
+
       - name: Start Local HTTP Server
         if: matrix.architecture.name != 'vax'
         run: python3 -m http.server 8080 --directory output &

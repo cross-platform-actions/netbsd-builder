@@ -145,6 +145,12 @@ variable "boot_console" {
   description = "The console device the boot loader and the kernel should use. An empty value leaves the platform default in place"
 }
 
+variable "package_repository" {
+  default = ""
+  type = string
+  description = "The binary package repository to install the packages from. An empty value keeps the one the installer configured"
+}
+
 locals {
   iso_target_extension = "iso"
   iso_target_path = "packer_cache"
@@ -293,6 +299,13 @@ source "qemu" "qemu" {
     ["-cpu", var.cpu_type],
     ["-boot", "strict=off"],
     ["-monitor", "none"],
+    # The installer is driven by typing at a console nothing ever reads, so
+    # when it goes wrong the only symptom is packer waiting for an SSH server
+    # that never appears. Capture the console to make that diagnosable.
+    # Not in the output directory: packer refuses to start when that directory
+    # already exists and isn't empty, so a log left behind by a previous run
+    # would break the next one.
+    ["-serial", "file:console.log"],
     ["-accel", "hvf"],
     ["-accel", "kvm"],
     ["-accel", "tcg"],
@@ -346,7 +359,8 @@ build {
     script = "resources/provision.sh"
     environment_vars = [
       "SECONDARY_USER=${var.secondary_user_username}",
-      "BOOT_CONSOLE=${var.boot_console}"
+      "BOOT_CONSOLE=${var.boot_console}",
+      "PACKAGE_REPOSITORY=${var.package_repository}"
     ]
   }
 

@@ -6,5 +6,6 @@ ssh_host_keys
 vax_packages
 output
 output-*
+console.log
 .claude/
 CLAUDE.md
