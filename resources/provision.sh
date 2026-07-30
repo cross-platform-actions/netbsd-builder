@@ -7,6 +7,21 @@ setup_path() {
   export PATH
 }
 
+# The repository the installer configures is the one for the release, which
+# tracks whatever pkgsrc branch is current. When a bulk build for that branch
+# is only partly finished, the published package index is missing packages that
+# are needed here, and pkgin reports them as unavailable even though the files
+# are present. Pointing at a finished branch avoids depending on the state of
+# an in-progress build.
+# See https://github.com/cross-platform-actions/action/issues/158.
+configure_package_repository() {
+  [ -n "$PACKAGE_REPOSITORY" ] || return 0
+
+  mkdir -p /usr/pkg/etc/pkgin
+  echo "$PACKAGE_REPOSITORY" > /usr/pkg/etc/pkgin/repositories.conf
+  pkgin -y update
+}
+
 install_extra_packages() {
   # On a port whose official mirrors carry no prebuilt pkgsrc binaries, the
   # sysinst-time "Enable installation of binary packages" step is skipped, so
@@ -103,5 +118,6 @@ configure_boot_console
 configure_boot_scripts
 set_hostname
 
+configure_package_repository
 install_extra_packages
 setup_sudo
