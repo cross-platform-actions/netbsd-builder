@@ -299,13 +299,23 @@ source "qemu" "qemu" {
     ["-cpu", var.cpu_type],
     ["-boot", "strict=off"],
     ["-monitor", "none"],
-    # The installer is driven by typing at a console nothing ever reads, so
-    # when it goes wrong the only symptom is packer waiting for an SSH server
-    # that never appears. Capture the console to make that diagnosable.
-    # Not in the output directory: packer refuses to start when that directory
-    # already exists and isn't empty, so a log left behind by a previous run
-    # would break the next one.
-    ["-serial", "file:console.log"],
+    # When the installer goes out of step the only symptom is packer waiting
+    # for an SSH server that never appears, so log the console to make that
+    # diagnosable.
+    #
+    # This has to stay a virtual console rather than become `file:`. On the
+    # platforms without a display device, the ARM64 one here, the installer's
+    # console is the serial port, and it reads the keystrokes packer types from
+    # it. A `file:` serial port only writes, so redirecting it there leaves the
+    # installer with no input at all and it never gets past its first screen.
+    # A chardev keeps the virtual console, and with it packer's input, while
+    # also writing everything to a file.
+    #
+    # The log is not in the output directory: packer refuses to start when that
+    # directory already exists and isn't empty, so a log left behind by a
+    # previous run would break the next one.
+    ["-chardev", "vc,id=console0,logfile=console.log"],
+    ["-serial", "chardev:console0"],
     ["-accel", "hvf"],
     ["-accel", "kvm"],
     ["-accel", "tcg"],
