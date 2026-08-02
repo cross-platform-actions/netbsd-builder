@@ -32,6 +32,11 @@ variable "secondary_user_username" {
   description = "The name for the secondary user"
 }
 
+variable "pkg_repo_release_url" {
+  type        = string
+  description = "Base download URL of the netbsd-pkg-repo release whose prebuilt vax packages are installed into the image (set by build.sh)"
+}
+
 locals {
   iso_target_extension = "iso"
   iso_target_path      = "packer_cache"
@@ -478,8 +483,15 @@ source "simh" "vax" {
     # traps the halt to SCP, the trailing QUIT ends the simulator
     # cleanly, and the disk image is the build artifact.
     ["# ",
-     "DISK_DEVICE='/dev/ra0a' DISK_NAME='ra0' HTTP_SERVER='{{ .HTTPIP }}:{{ .HTTPPort }}' sh /tmp/post_install_vax.sh && halt -p<enter>",
-     "Run post_install_vax.sh, then halt"],
+     "DISK_DEVICE='/dev/ra0a' DISK_NAME='ra0' HTTP_SERVER='{{ .HTTPIP }}:{{ .HTTPPort }}' SECONDARY_USER='${var.secondary_user_username}' PKG_RELEASE_URL='${var.pkg_repo_release_url}' sh /tmp/post_install_vax.sh<enter>",
+     "Run post_install_vax.sh"],
+
+    # Wait for the marker post_install_vax.sh echoes when it completes, then
+    # `halt -p` (SIMHALT traps the halt to end the simulator). Gating the halt
+    # on the marker instead of chaining `&& halt -p` onto the run command means
+    # a failed provisioning run (set -e aborts before the marker) trips this
+    # step's boot_step_timeout rather than halting as if it had succeeded.
+    ["VAXBUILD_POST_INSTALL_DONE", "halt -p<enter>", "post-install complete; halt"],
   ]
 
   # No communicator: we don't try to SSH into the installed system from
@@ -488,8 +500,14 @@ source "simh" "vax" {
   # the target system at /mnt before the installer halts.
   communicator = "none"
 
-  http_directory   = "."
-  shutdown_timeout = "15m"
+  http_directory = "."
+
+  # Upper bound on post_install_vax.sh finishing (provisioning the target and
+  # zeroing free space) and reaching `halt -p`. It normally completes within a
+  # few minutes, but this is a MAX wait -- a run that halts sooner exits
+  # immediately -- so the generous headroom is free on success and just bounds a
+  # genuinely hung or pathologically slow emulated run.
+  shutdown_timeout = "90m"
 }
 
 packer {

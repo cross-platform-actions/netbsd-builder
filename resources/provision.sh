@@ -8,10 +8,9 @@ setup_path() {
 }
 
 install_extra_packages() {
-  # pkgin isn't available on every NetBSD port (e.g. NetBSD/VAX has no
-  # prebuilt pkgsrc binaries on the official mirrors), so the sysinst-time
-  # "Enable installation of binary packages" step is skipped on those
-  # ports. If pkgin isn't installed, skip the package install.
+  # On a port whose official mirrors carry no prebuilt pkgsrc binaries, the
+  # sysinst-time "Enable installation of binary packages" step is skipped, so
+  # pkgin never gets installed. Skip the package install cleanly in that case.
   if ! command -v pkgin >/dev/null 2>&1; then
     echo "pkgin not available on this port; skipping extra package install"
     return 0

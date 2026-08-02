@@ -206,11 +206,13 @@ jobs:
           }
 
           # The host keys are pre-generated into the image, but booting
-          # an emulated VAX to sshd still takes ~15 minutes — poll for
-          # up to ~40 minutes (double-emulated local runs under act on
-          # ARM hosts take about twice as long as CI).
+          # an emulated VAX to sshd still takes ~15 minutes — and a loaded
+          # CI runner (or a boot that falls back to regenerating a host key)
+          # can push well past that, so poll for up to ~60 minutes. Attempts
+          # while the port is still closed fail instantly via slirp's RST, so
+          # a generous cap doesn't slow the common case.
           ok=
-          for _ in $(seq 1 120); do
+          for _ in $(seq 1 180); do
             if ssh_vax true 2>/dev/null; then ok=1; break; fi
             sleep 20
           done
@@ -222,9 +224,20 @@ jobs:
 
           uname_out=$(ssh_vax 'uname -sm')
           echo "guest uname: $uname_out"
+
+          # Verify the pkgsrc packages were baked into the image (checking the
+          # installed binaries directly avoids any pkgdb-location ambiguity).
+          pkgs_out=$(ssh_vax 'for b in bash curl pkgin rsync sudo; do
+              if [ -x "/usr/pkg/bin/$b" ]; then echo "$b ok"; else echo "$b MISSING"; fi
+            done')
+          echo "guest packages:"; echo "$pkgs_out"
+
           kill "$simh_pid" 2>/dev/null || true
           echo "$uname_out" | grep -q NetBSD
           echo "$uname_out" | grep -q vax
+          for b in bash curl pkgin rsync sudo; do
+            echo "$pkgs_out" | grep -qx "$b ok"
+          done
 
       - name: Create Release
         if: github.ref_type == 'tag'

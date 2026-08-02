@@ -77,10 +77,30 @@ if [ "$ARCHITECTURE" = "vax" ]; then
     ssh-keygen -q -N '' -t "$key_type" -f "ssh_host_keys/ssh_host_${key_type}_key"
   done
 
+  # Fetch the prebuilt vax pkgsrc packages from the netbsd-pkg-repo release
+  # into a directory packer serves over HTTP (http_directory = "."). The
+  # official NetBSD mirrors carry no vax binaries, so the emulated VAX cannot
+  # bootstrap pkgin itself; post_install_vax.sh fetches each package from here
+  # into the target and installs it from that local copy (no TLS on the ~1 MIPS
+  # VAX). Pinned to a release for reproducibility -- bump pkg_repo_version for a
+  # newer set.
+  pkg_repo="cross-platform-actions/netbsd-pkg-repo"
+  pkg_repo_version="v0.0.1"
+  pkg_repo_tag="NetBSD-${OS_VERSION}-vax--${pkg_repo_version}"
+  pkg_release_url="https://github.com/${pkg_repo}/releases/download/${pkg_repo_tag}"
+  rm -rf vax_packages
+  mkdir -p vax_packages/All
+  gh release download "$pkg_repo_tag" --repo "$pkg_repo" --dir vax_packages/All --clobber
+  # A MANIFEST of the .tgz names so post_install_vax.sh can fetch each package
+  # by name with the installer's ftp (no directory-listing parsing needed) and
+  # install from the local copies.
+  ( cd vax_packages/All && ls -1 ./*.tgz | sed 's,^\./,,' > MANIFEST )
+
   packer init netbsd-vax.pkr.hcl
 
   packer build \
     -var os_version="$OS_VERSION" \
+    -var pkg_repo_release_url="$pkg_release_url" \
     -var-file "var_files/common.pkrvars.hcl" \
     -var-file "var_files/$OS_VERSION/vax.pkrvars.hcl" \
     "$@" \
