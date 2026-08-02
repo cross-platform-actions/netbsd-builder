@@ -6,7 +6,7 @@ env:
 on:
   push:
     branches:
-      - '*'
+      - '**'
     tags:
       - 'v*'
   pull_request:
@@ -25,6 +25,7 @@ jobs:
             - 9.4
             - '10.0'
             - '10.1'
+            - '11.0'
 
           architecture:
             - name: x86-64

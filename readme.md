@@ -34,6 +34,7 @@ The following architectures and versions are supported:
 
 | Version | x86-64 | ARM64 |
 |---------|--------|-------|
+| 11.0    | ✓      | ✓     |
 | 10.1    | ✓      | ✓     |
 | 10.0    | ✓      | ✓     |
 | 9.4     | ✓      | ✗     |
