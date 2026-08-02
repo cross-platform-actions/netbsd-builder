@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- Added support for NetBSD 11.0
 - Added support for NetBSD VAX via the SIMH simulator using packer-plugin-simh
 - Install bash, curl, pkgin, rsync and sudo on NetBSD/VAX from the [netbsd-pkg-repo](https://github.com/cross-platform-actions/netbsd-pkg-repo) release (the official mirrors carry no vax binaries)
 
