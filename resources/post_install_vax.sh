@@ -36,6 +36,24 @@ HOSTNAME="${HOSTNAME:-runnervmg1sw1.local}"
 dkctl "${DISK_NAME:-sd0}" makewedges
 mount "$DISK_DEVICE" /mnt
 
+# Install the SSH host keys that rc.d/sshd would otherwise generate on
+# the consumer's first boot — RSA-3072 generation takes ~20 minutes at
+# the emulated VAX's ~1 MIPS, all spent before sshd accepts
+# connections. build.sh generates the keys on the build host and this
+# fetches them over packer's HTTP server (the same channel that
+# delivered this script). The keys are shared by every VM booted from
+# the published image, which is fine for its purpose: throwaway CI
+# guests reached with StrictHostKeyChecking=no.
+install_ssh_host_keys() {
+  for key_type in rsa ecdsa ed25519; do
+    key="ssh_host_${key_type}_key"
+    ftp -o "/mnt/etc/ssh/$key" "http://${HTTP_SERVER}/ssh_host_keys/$key"
+    ftp -o "/mnt/etc/ssh/$key.pub" "http://${HTTP_SERVER}/ssh_host_keys/$key.pub"
+    chmod 600 "/mnt/etc/ssh/$key"
+    chmod 644 "/mnt/etc/ssh/$key.pub"
+  done
+}
+
 configure_ssh() {
   cat <<EOF >> /mnt/etc/ssh/sshd_config
 PermitRootLogin yes
@@ -69,6 +87,7 @@ minimize_disk() {
   rm -f /mnt/EMPTY
 }
 
+install_ssh_host_keys
 configure_ssh
 enable_sshd_at_boot
 configure_boot_flags

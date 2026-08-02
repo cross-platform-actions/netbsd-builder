@@ -201,9 +201,10 @@ jobs:
               -o ConnectTimeout=60 runner@127.0.0.1 "$@"
           }
 
-          # First boot generates ssh host keys, slow on an emulated VAX —
-          # poll for up to ~40 minutes (double-emulated local runs under
-          # act on ARM hosts need well over 20).
+          # The host keys are pre-generated into the image, but booting
+          # an emulated VAX to sshd still takes ~15 minutes — poll for
+          # up to ~40 minutes (double-emulated local runs under act on
+          # ARM hosts take about twice as long as CI).
           ok=
           for _ in $(seq 1 120); do
             if ssh_vax true 2>/dev/null; then ok=1; break; fi

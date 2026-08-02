@@ -2,6 +2,7 @@ resources/ovmf.fd
 resources/qemu_efi.fd
 packer_cache
 packer_cache_backup
+ssh_host_keys
 output
 output-*
 .claude/

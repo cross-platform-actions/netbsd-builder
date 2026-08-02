@@ -65,6 +65,18 @@ download_install_media || true
 # doesn't declare cpus/disk_size/etc. (those become harmless
 # undeclared-variable warnings) and fixes memory itself.
 if [ "$ARCHITECTURE" = "vax" ]; then
+  # Generate the image's SSH host keys on the build host. Generating
+  # them on the emulated VAX — whether at build time or by rc.d/sshd on
+  # the consumer's first boot — costs ~20 minutes at ~1 MIPS (RSA-3072
+  # dominates). post_install_vax.sh fetches these over packer's HTTP
+  # server into /mnt/etc/ssh, so the consumer's sshd starts
+  # immediately.
+  rm -rf ssh_host_keys
+  mkdir ssh_host_keys
+  for key_type in rsa ecdsa ed25519; do
+    ssh-keygen -q -N '' -t "$key_type" -f "ssh_host_keys/ssh_host_${key_type}_key"
+  done
+
   packer init netbsd-vax.pkr.hcl
 
   packer build \

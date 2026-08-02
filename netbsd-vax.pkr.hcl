@@ -478,7 +478,7 @@ source "simh" "vax" {
     # traps the halt to SCP, the trailing QUIT ends the simulator
     # cleanly, and the disk image is the build artifact.
     ["# ",
-     "DISK_DEVICE='/dev/ra0a' DISK_NAME='ra0' sh /tmp/post_install_vax.sh && halt -p<enter>",
+     "DISK_DEVICE='/dev/ra0a' DISK_NAME='ra0' HTTP_SERVER='{{ .HTTPIP }}:{{ .HTTPPort }}' sh /tmp/post_install_vax.sh && halt -p<enter>",
      "Run post_install_vax.sh, then halt"],
   ]
 
