@@ -8,10 +8,27 @@ setup_path() {
 }
 
 install_extra_packages() {
+  # pkgin isn't available on every NetBSD port (e.g. NetBSD/VAX has no
+  # prebuilt pkgsrc binaries on the official mirrors), so the sysinst-time
+  # "Enable installation of binary packages" step is skipped on those
+  # ports. If pkgin isn't installed, skip the package install.
+  if ! command -v pkgin >/dev/null 2>&1; then
+    echo "pkgin not available on this port; skipping extra package install"
+    return 0
+  fi
+
   pkgin -y install bash curl rsync sudo
 }
 
 setup_sudo() {
+  # sudo comes from pkgsrc; if pkgin wasn't usable above, sudo isn't on
+  # this image and there's no sudoers.d to write into. Skip cleanly so the
+  # provisioner still finishes.
+  if ! command -v sudo >/dev/null 2>&1; then
+    echo "sudo not installed on this port; skipping sudoers setup"
+    return 0
+  fi
+
   mkdir -p /usr/pkg/etc/sudoers.d
   cat <<EOF > "/usr/pkg/etc/sudoers.d/$SECONDARY_USER"
 Defaults:$SECONDARY_USER !requiretty
