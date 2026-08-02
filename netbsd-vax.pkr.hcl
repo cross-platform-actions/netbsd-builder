@@ -43,7 +43,10 @@ locals {
 source "simh" "vax" {
   simh_binary = "vax"
 
+  # Old releases move to archive.netbsd.org (see netbsd.pkr.hcl); the
+  # archive URL 404s for current releases and packer falls through.
   iso_urls = [
+    "https://archive.netbsd.org/pub/NetBSD-archive/${local.full_remote_path}",
     "https://cdn.netbsd.org/pub/NetBSD/${local.full_remote_path}",
     "https://ftp.netbsd.org/pub/NetBSD/${local.full_remote_path}",
     "https://mirror.planetunix.net/pub/NetBSD/${local.full_remote_path}",

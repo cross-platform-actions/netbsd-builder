@@ -301,12 +301,17 @@ source "qemu" "qemu" {
   iso_checksum = var.checksum
   iso_target_extension = local.iso_target_extension
   iso_target_path = local.iso_target_path
+  # Old releases are moved off the main site to archive.netbsd.org,
+  # where cdn/ftp then redirect to a directory URL — the download gets
+  # an HTML "Document Moved" page and fails the checksum. The archive
+  # mirrors the images/<version>/ layout, so one archive URL covers
+  # every moved release; for current releases it just 404s and packer
+  # falls through to the mirrors below.
   iso_urls = [
-    "https://cdn.netbsd.org/pub/NetBSD/${local.full_remote_path}",
     "https://archive.netbsd.org/pub/NetBSD-archive/${local.full_remote_path}",
+    "https://cdn.netbsd.org/pub/NetBSD/${local.full_remote_path}",
     "https://ftp.netbsd.org/pub/NetBSD/${local.full_remote_path}",
     "https://mirror.planetunix.net/pub/NetBSD/${local.full_remote_path}",
-    "https://www.nic.funet.fi/pub/NetBSD/${local.full_remote_path}",
     "https://www.nic.funet.fi/pub/NetBSD/${local.full_remote_path}",
     "https://ftp.uni-erlangen.de/netbsd/${local.full_remote_path}",
     "https://ftp.allbsd.org/NetBSD/${local.full_remote_path}",

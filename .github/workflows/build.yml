@@ -19,6 +19,8 @@ jobs:
     name: ${{ matrix.version }}, ${{ matrix.architecture.name }}
     runs-on: ubuntu-latest
     strategy:
+        # One job's flaky mirror shouldn't cancel the other builds.
+        fail-fast: false
         matrix:
           version:
             - 9.2

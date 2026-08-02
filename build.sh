@@ -7,6 +7,58 @@ ARCHITECTURE="$1"; shift
 
 # rm -rf packer_cache
 
+# Seed packer's ISO cache with a resilient download. Old releases are
+# moved to archive.netbsd.org, which intermittently closes connections
+# mid-transfer, and packer's go-getter neither retries nor resumes a
+# download — curl does both. The file is named sha1(checksum string),
+# matching go-getter's cache naming, so packer verifies the seeded file
+# and skips its own download. On any failure the cache is left unseeded
+# and packer downloads via iso_urls as before.
+download_install_media() {
+  checksum=$(awk -F'"' '/^checksum *=/ { print $2 }' "var_files/$OS_VERSION/$ARCHITECTURE.pkrvars.hcl")
+
+  if [ "$ARCHITECTURE" = "vax" ]; then
+    image_architecture="vax"
+  else
+    image_architecture=$(awk -F'"' '/^ *image *=/ { print $2 }' "var_files/$ARCHITECTURE.pkrvars.hcl")
+  fi
+
+  image="NetBSD-$OS_VERSION-$image_architecture.iso"
+  cache_key=$(printf '%s' "$checksum" | openssl dgst -sha1 -r | cut -d ' ' -f 1)
+  target="packer_cache/$cache_key.iso"
+
+  if [ -f "$target" ]; then
+    return 0
+  fi
+
+  mkdir -p packer_cache
+
+  for url in \
+    "https://archive.netbsd.org/pub/NetBSD-archive/images/$OS_VERSION/$image" \
+    "https://cdn.netbsd.org/pub/NetBSD/images/$OS_VERSION/$image"
+  do
+    # -C - resumes a partial file, so each attempt continues where the
+    # previous one was cut off instead of starting over.
+    for _ in 1 2 3 4 5; do
+      curl -fL --connect-timeout 30 -C - -o "$target" "$url" && break
+    done
+
+    digest_type=${checksum%%:*}
+    expected=${checksum#*:}
+    actual=$(openssl dgst "-$digest_type" -r "$target" 2>/dev/null | cut -d ' ' -f 1) || actual=""
+
+    if [ "$actual" = "$expected" ]; then
+      return 0
+    fi
+
+    rm -f "$target"
+  done
+
+  return 1
+}
+
+download_install_media || true
+
 # NetBSD/VAX is built by the SIMH plugin from a separate template. It
 # shares var_files/common.pkrvars.hcl (the user/password identity) with
 # the qemu builds, but not the qemu-specific layers — the VAX template
