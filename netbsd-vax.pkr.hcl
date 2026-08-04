@@ -210,7 +210,7 @@ source "simh" "vax" {
      "d<enter>",
      "Custom installation"],
 
-    # Distribution set: on VAX 10.1 "Compiler tools" is at letter 'e'
+    # Distribution set: on VAX 10.1 and 11.0 "Compiler tools" is at 'e'
     # (Kernel modules appears between Kernel and Base, shifting items).
     ["e: Compiler tools",
      "e<enter>",
@@ -283,9 +283,12 @@ source "simh" "vax" {
      "<wait2s>o<enter>",
      "Add a user"],
 
-    # The user-add form opens with sysinst's MSG_addusername prompt
-    # ("8 character username to add"), painted fresh on activation.
-    ["8 character username to add",
+    # The user-add form opens with sysinst's MSG_addusername prompt,
+    # painted fresh on activation. Its wording is version-specific --
+    # "8 character username to add" on 10.x, "Username to add (maximum 8
+    # characters)" on 11.0 -- so anchor on the substring both share
+    # (dropping the leading "U"/"u", which differs in case).
+    ["sername to add",
      "${var.secondary_user_username}<enter>",
      "Enter username"],
 
@@ -334,6 +337,11 @@ source "simh" "vax" {
     # and patch rc.conf, which takes a few seconds on an emulated VAX —
     # the queued keystrokes are processed once the menu loop reads
     # input again.
+    #
+    # The blind h/i (and the 'a' and 'x' below) depend on configmenu row
+    # letters. 11.0 appends a row ("Run /bin/sh") after the entropy row,
+    # which leaves a-o and the fixed 'x' exit row untouched; a future
+    # release inserting a row higher up would shift them.
     ["g: Enable sshd",
      "<wait2s>g<enter>",
      "Toggle Enable sshd"],
