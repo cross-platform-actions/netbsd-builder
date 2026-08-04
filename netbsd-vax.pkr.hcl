@@ -442,7 +442,7 @@ source "simh" "vax" {
     # network flow returns — the exit row "x: Finished configuring" is
     # fresh bytes. Skip pkgin entirely on VAX: NetBSD doesn't publish
     # prebuilt pkgsrc binaries under the URL sysinst constructs
-    # (vax/10.1/All/), so the built-in pkgin installer always fails.
+    # (vax/<version>/All/), so the built-in pkgin installer always fails.
     # Press 'x: Finished configuring' directly instead of 'e' for
     # binary packages.
     ["x: Finished configuring",

@@ -40,10 +40,16 @@ jobs:
               qemu: aarch64
               uname: aarch64
 
-          # NetBSD/VAX is built by the SIMH plugin, not qemu, and only
-          # 10.1 has a vax var file — add it as a single extra job.
+          # NetBSD/VAX is built by the SIMH plugin, not qemu, so it can't
+          # be part of the architecture list above — add one extra job per
+          # version that has a vax var file.
           include:
             - version: '10.1'
+              architecture:
+                name: vax
+                uname: vax
+
+            - version: '11.0'
               architecture:
                 name: vax
                 uname: vax

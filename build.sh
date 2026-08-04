@@ -83,9 +83,11 @@ if [ "$ARCHITECTURE" = "vax" ]; then
   # bootstrap pkgin itself; post_install_vax.sh fetches each package from here
   # into the target and installs it from that local copy (no TLS on the ~1 MIPS
   # VAX). Pinned to a release for reproducibility -- bump pkg_repo_version for a
-  # newer set.
+  # newer set. The same version is published per NetBSD release
+  # (NetBSD-<version>-vax--<pkg_repo_version>), so it must exist for every
+  # version built here -- v0.1.0 is the first one covering both 10.1 and 11.0.
   pkg_repo="cross-platform-actions/netbsd-pkg-repo"
-  pkg_repo_version="v0.0.1"
+  pkg_repo_version="v0.1.0"
   pkg_repo_tag="NetBSD-${OS_VERSION}-vax--${pkg_repo_version}"
   pkg_release_url="https://github.com/${pkg_repo}/releases/download/${pkg_repo_tag}"
   rm -rf vax_packages
