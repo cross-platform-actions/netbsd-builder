@@ -137,30 +137,48 @@ jobs:
 
       # When the install goes wrong, packer only reports that it gave up
       # waiting for SSH. The guest console says what actually happened.
-      # Only the qemu template captures a console log; the vax template is
-      # driven by the SIMH plugin, which writes none.
       #
-      # Expect real content only for ARM64, whose console is the serial port:
-      # it logs the whole install, from the UEFI firmware to `login:`. On
+      # The two templates write it in different places. The qemu one points a
+      # chardev at `console.log` in the working directory, deliberately not in
+      # the output directory, since packer refuses to start when that exists
+      # and isn't empty. The SIMH plugin writes into the output directory it
+      # manages itself, as `<vm_name>.console.log` via `SET CONSOLE LOG` plus
+      # `<vm_name>.console.tee.log` mirrored as it reads the console, both on
+      # by default. So match all of them rather than one fixed path.
+      #
+      # Expect real content for ARM64 and VAX, whose console is the serial
+      # port: they log the whole install, from the firmware to `login:`. On
       # x86-64 the console is the display instead, and the single boot from
       # disk during a build happens before provision.sh sets `consdev`, so
       # nothing is written to the serial port and the log holds just QEMU's
       # own one-line virtual console banner. That is not a broken capture.
       - name: Print the guest console log
-        if: failure() && matrix.architecture.name != 'vax'
+        if: failure()
         run: |
-          if [ -f console.log ]; then
-            cat console.log
-          else
-            echo 'No console log was produced at console.log'
+          printed=false
+
+          for log in console.log output/*.console.log output/*.console.tee.log; do
+            [ -f "$log" ] || continue
+            printed=true
+            echo "===== $log"
+            cat "$log"
+          done
+
+          if [ "$printed" = false ]; then
+            echo 'No console log was produced'
           fi
 
       - name: Upload the guest console log
-        if: failure() && matrix.architecture.name != 'vax'
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: console-${{ matrix.version }}-${{ matrix.architecture.name }}
-          path: console.log
+          # Named explicitly rather than uploading the output directory, which
+          # also holds the built image.
+          path: |
+            console.log
+            output/*.console.log
+            output/*.console.tee.log
           if-no-files-found: warn
 
       - name: Start Local HTTP Server
