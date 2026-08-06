@@ -116,6 +116,12 @@ jobs:
           # packer init resolves plugins via the GitHub API; anonymous
           # requests share the runner IP's rate limit and get 403s.
           PACKER_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # The vax build fetches the prebuilt packages with `gh release
+          # download`, which reads GH_TOKEN. Unauthenticated it shares the
+          # runner IP's anonymous rate limit and intermittently 403s.
+          # netbsd-pkg-repo is public, so the repo-scoped token only needs
+          # to lift the rate limit, not grant access.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # headless is a qemu-template variable; the vax template
           # doesn't declare it, and passing an undeclared -var is a hard
