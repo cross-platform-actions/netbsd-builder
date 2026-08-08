@@ -219,6 +219,18 @@ jobs:
             [ "`uname -m`" = '${{ matrix.architecture.uname || matrix.architecture.name }}' ] || [ "`uname -p`" = '${{ matrix.architecture.uname || matrix.architecture.name }}' ]
             [ "`pwd`" = '/home/runner/work/netbsd-builder/netbsd-builder' ]
             [ "`hostname`" = 'runnervmg1sw1.local' ]
+
+            # Everything the image is expected to add on top of a stock
+            # install: bash, curl, rsync and sudo come from pkgsrc via
+            # provision.sh, pkgin from the sysinst binary-packages step that
+            # installs them, cc from the sysinst "Compiler tools" set.
+            # `exit 1` rather than relying on the script running under -e.
+            echo 'installed tools:'
+            for cmd in bash curl pkgin rsync sudo cc; do
+              printf '%s: ' "$cmd"
+              command -v "$cmd" || exit 1
+            done
+
             cat host_to_guest.txt | grep -q 'host to guest'
             echo 'guest to host' > guest_to_host.txt
 
@@ -284,18 +296,26 @@ jobs:
           uname_out=$(ssh_vax 'uname -sm')
           echo "guest uname: $uname_out"
 
-          # Verify the pkgsrc packages were baked into the image (checking the
-          # installed binaries directly avoids any pkgdb-location ambiguity).
-          pkgs_out=$(ssh_vax 'for b in bash curl pkgin rsync sudo; do
-              if [ -x "/usr/pkg/bin/$b" ]; then echo "$b ok"; else echo "$b MISSING"; fi
-            done')
-          echo "guest packages:"; echo "$pkgs_out"
+          # Verify the tools the image adds on top of a stock install were
+          # baked in: the pkgsrc ones under /usr/pkg/bin, plus cc from the
+          # sysinst "Compiler tools" set. Checking the binaries by absolute
+          # path avoids both pkgdb-location ambiguity and any dependence on
+          # what PATH a non-interactive ssh session gets.
+          # A line continuation, not a newline: the list is interpolated into
+          # the remote `for` below, where a newline would end it early.
+          tools="/usr/pkg/bin/bash /usr/pkg/bin/curl /usr/pkg/bin/pkgin \
+            /usr/pkg/bin/rsync /usr/pkg/bin/sudo /usr/bin/cc"
+
+          tools_out=$(ssh_vax "for b in $tools; do
+              if [ -x \"\$b\" ]; then echo \"\$b ok\"; else echo \"\$b MISSING\"; fi
+            done")
+          echo "guest tools:"; echo "$tools_out"
 
           kill "$simh_pid" 2>/dev/null || true
           echo "$uname_out" | grep -q NetBSD
           echo "$uname_out" | grep -q vax
-          for b in bash curl pkgin rsync sudo; do
-            echo "$pkgs_out" | grep -qx "$b ok"
+          for b in $tools; do
+            echo "$tools_out" | grep -qx "$b ok"
           done
 
       - name: Create Release
