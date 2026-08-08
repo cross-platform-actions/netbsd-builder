@@ -82,3 +82,58 @@ display device at all.
 
 The qcow2 format is chosen because unused space doesn't take up any space on
 disk, it's compressible and easily converts the raw format.
+
+## Contributing
+
+### Changelog
+
+The changelog is maintained in the [changelog.md](changelog.md) file, following
+the [Keep a Changelog] format. The changelog is updated incrementally. That is,
+for every new feature or bugfix, add an entry to the changelog under the
+[Unreleased] section using an appropriate sub header (`Added`, `Changed`,
+`Deprecated`, `Removed`, `Fixed`, or `Security`).
+
+Entries under these sub headers determine the semantic version bump when the
+next release is cut with [relog].
+
+### Creating a Release
+
+Releases are cut with [relog], driven by the [Unreleased] section of
+`changelog.md`. relog derives the next version from the sub headers under
+[Unreleased]:
+
+* `### Fixed` only → patch bump
+* `### Added`, `### Changed`, `### Deprecated` → minor bump
+* `### Removed` (or "Breaking" anywhere in the section) → major bump
+
+To cut a release, from a clean `master` working tree, run:
+
+```
+relog
+```
+
+To preview the changes without modifying anything:
+
+```
+relog --dry-run
+```
+
+To override the auto-detected version:
+
+```
+relog X.Y.Z
+```
+
+relog rewrites the changelog, runs the `pre_commit` hooks in
+[`release.conf`](release.conf) (which point the "latest release" link at the top
+of this readme at the new tag), commits the result, creates an annotated
+`vX.Y.Z` tag, and prompts before pushing. Pushing the `vX.Y.Z` tag triggers the
+GitHub Actions workflow defined in
+[`.github/workflows/build.yml`](.github/workflows/build.yml), which builds the
+VM images and, in the "Create Release" step, creates a draft GitHub release
+using the newly added changelog section as the release notes. Review the draft
+release on GitHub and publish it.
+
+[Keep a Changelog]: https://keepachangelog.com/en/1.1.0/
+[relog]: https://github.com/jacob-carlborg/relog
+[Unreleased]: https://github.com/cross-platform-actions/netbsd-builder/blob/master/changelog.md#unreleased
