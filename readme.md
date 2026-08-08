@@ -1,5 +1,11 @@
 # NetBSD Builder
 
+> [!IMPORTANT]
+> This readme documents the `master` branch, which may describe features and
+> NetBSD versions that have not been released yet. For the documentation
+> matching the latest release, see the
+> [readme for the latest release](https://github.com/cross-platform-actions/netbsd-builder/blob/v0.6.0/readme.md).
+
 This project builds the NetBSD VM image for the
 [cross-platform-actions/action](https://github.com/cross-platform-actions/action)
 GitHub action. The image contains a standard NetBSD installation without any
