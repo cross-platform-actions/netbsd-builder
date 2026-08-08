@@ -98,6 +98,24 @@ variable "root_password_pre_steps" {
   description = "A few boot steps needed before entering the root password"
 }
 
+# The reference letters in the "Custom installation" distribution set menu are
+# positional: every set the port has shifts the ones below it. A release that
+# adds a set moves the letters, and it does so per port, since the list depends
+# on what that port has. NetBSD 11.0 added "Manual pages (HTML)" everywhere, and
+# on amd64 also "Base 32-bit compatibility libraries", so both keys below differ
+# per architecture there. Getting one wrong is quiet: the wrong item is toggled
+# and the install still succeeds, just not with the sets that were meant.
+#
+# To re-derive them for a new release, walk an installer to that menu and read
+# it, rather than assuming the previous release's letters still hold. On the
+# ports whose console is the serial port the menu is in the console log; on
+# amd64 it is only on the display, so take a qemu `screendump`.
+variable "key_compiler_tools" {
+  default = "f"
+  type = string
+  description = "The key used to select the compiler tools set"
+}
+
 variable "key_x11_sets" {
   default = "n"
   type = string
@@ -210,7 +228,7 @@ source "qemu" "qemu" {
     [
       ["d<enter><wait>", "Custom installation"],
       // Distribution set:
-      ["f<enter><wait5>", "Compiler tools"],
+      ["${var.key_compiler_tools}<enter><wait5>", "Compiler tools"],
       ["${var.key_x11_sets}<enter><wait5>", "X11 sets"],
       // X11 sets:
       ["f<enter><wait5>", "Select all of the above sets"],

@@ -219,6 +219,40 @@ jobs:
             [ "`uname -m`" = '${{ matrix.architecture.uname || matrix.architecture.name }}' ] || [ "`uname -p`" = '${{ matrix.architecture.uname || matrix.architecture.name }}' ]
             [ "`pwd`" = '/home/runner/work/netbsd-builder/netbsd-builder' ]
             [ "`hostname`" = 'runnervmg1sw1.local' ]
+
+            # Everything the image is expected to add on top of a stock
+            # install: bash, curl, rsync and sudo come from pkgsrc via
+            # provision.sh, pkgin from the sysinst binary-packages step that
+            # installs them, cc from the sysinst "Compiler tools" set.
+            # `exit 1` rather than relying on the script running under -e.
+            echo 'installed tools:'
+            for cmd in bash curl pkgin rsync sudo cc; do
+              printf '%s: ' "$cmd"
+              command -v "$cmd" || exit 1
+            done
+
+            # The install also selects every X11 set, and nothing noticed when
+            # a wrong set-menu keystroke silently dropped them. One
+            # representative file per set is enough to tell installed from not:
+            # xbase, xcomp, xetc, xfont, xserver in that order. The fonts
+            # directory itself belongs to xbase, so xfont has to be checked by
+            # a font file rather than by the directory.
+            echo 'X11 sets:'
+            for path in \
+              /usr/X11R7/bin/xrdb \
+              /usr/X11R7/include/X11/Xlib.h \
+              /etc/X11/xdm/Xaccess \
+              /usr/X11R7/lib/X11/fonts/misc/10x20-ISO8859-1.pcf.gz \
+              /usr/X11R7/bin/Xvfb
+            do
+              if [ -e "$path" ]; then
+                echo "$path ok"
+              else
+                echo "$path MISSING"
+                exit 1
+              fi
+            done
+
             cat host_to_guest.txt | grep -q 'host to guest'
             echo 'guest to host' > guest_to_host.txt
 
@@ -284,18 +318,26 @@ jobs:
           uname_out=$(ssh_vax 'uname -sm')
           echo "guest uname: $uname_out"
 
-          # Verify the pkgsrc packages were baked into the image (checking the
-          # installed binaries directly avoids any pkgdb-location ambiguity).
-          pkgs_out=$(ssh_vax 'for b in bash curl pkgin rsync sudo; do
-              if [ -x "/usr/pkg/bin/$b" ]; then echo "$b ok"; else echo "$b MISSING"; fi
-            done')
-          echo "guest packages:"; echo "$pkgs_out"
+          # Verify the tools the image adds on top of a stock install were
+          # baked in: the pkgsrc ones under /usr/pkg/bin, plus cc from the
+          # sysinst "Compiler tools" set. Checking the binaries by absolute
+          # path avoids both pkgdb-location ambiguity and any dependence on
+          # what PATH a non-interactive ssh session gets.
+          # A line continuation, not a newline: the list is interpolated into
+          # the remote `for` below, where a newline would end it early.
+          tools="/usr/pkg/bin/bash /usr/pkg/bin/curl /usr/pkg/bin/pkgin \
+            /usr/pkg/bin/rsync /usr/pkg/bin/sudo /usr/bin/cc"
+
+          tools_out=$(ssh_vax "for b in $tools; do
+              if [ -x \"\$b\" ]; then echo \"\$b ok\"; else echo \"\$b MISSING\"; fi
+            done")
+          echo "guest tools:"; echo "$tools_out"
 
           kill "$simh_pid" 2>/dev/null || true
           echo "$uname_out" | grep -q NetBSD
           echo "$uname_out" | grep -q vax
-          for b in bash curl pkgin rsync sudo; do
-            echo "$pkgs_out" | grep -qx "$b ok"
+          for b in $tools; do
+            echo "$tools_out" | grep -qx "$b ok"
           done
 
       - name: Create Release
