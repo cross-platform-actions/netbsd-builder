@@ -231,6 +231,28 @@ jobs:
               command -v "$cmd" || exit 1
             done
 
+            # The install also selects every X11 set, and nothing noticed when
+            # a wrong set-menu keystroke silently dropped them. One
+            # representative file per set is enough to tell installed from not:
+            # xbase, xcomp, xetc, xfont, xserver in that order. The fonts
+            # directory itself belongs to xbase, so xfont has to be checked by
+            # a font file rather than by the directory.
+            echo 'X11 sets:'
+            for path in \
+              /usr/X11R7/bin/xrdb \
+              /usr/X11R7/include/X11/Xlib.h \
+              /etc/X11/xdm/Xaccess \
+              /usr/X11R7/lib/X11/fonts/misc/10x20-ISO8859-1.pcf.gz \
+              /usr/X11R7/bin/Xvfb
+            do
+              if [ -e "$path" ]; then
+                echo "$path ok"
+              else
+                echo "$path MISSING"
+                exit 1
+              fi
+            done
+
             cat host_to_guest.txt | grep -q 'host to guest'
             echo 'guest to host' > guest_to_host.txt
 
