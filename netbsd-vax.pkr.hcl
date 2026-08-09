@@ -312,8 +312,9 @@ source "simh" "vax" {
     # output that arrived after the shell selection above, so each
     # occurrence here is fresh bytes. The secondary_user_password is
     # also all-lowercase, so passwd(1) re-prompts for "New password:"
-    # before "Retype new password:" — three prompts total. This is the
-    # password the CI harness logs in with over ssh.
+    # before "Retype new password:" — three prompts total. sysinst gives
+    # no way to leave the password empty, so post_install_vax.sh clears it
+    # afterwards; this password is never used to log in.
     ["New password:",
      "${var.secondary_user_password}<enter>",
      "Enter user password"],
