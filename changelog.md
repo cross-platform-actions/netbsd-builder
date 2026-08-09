@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.7.0] - 2026-08-09
 ### Added
 - Added support for NetBSD 11.0
 - Added support for NetBSD VAX via the SIMH simulator using packer-plugin-simh
@@ -46,7 +48,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial release
 
-[Unreleased]: https://github.com/cross-platform-actions/netbsd-builder/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/cross-platform-actions/netbsd-builder/compare/v0.7.0...HEAD
+
+[0.7.0]: https://github.com/cross-platform-actions/netbsd-builder/compare/v0.6.0...v0.7.0
 
 [0.6.0]: https://github.com/cross-platform-actions/netbsd-builder/compare/v0.5.1...v0.6.0
 
