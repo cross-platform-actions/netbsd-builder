@@ -264,12 +264,11 @@ jobs:
       # image, so boot the built image under SIMH directly: decompress the
       # distributed artifact to RAW (what a consumer does), autoboot the
       # disk via EXPECT/SEND, wait for sshd, and run uname as the secondary
-      # user over password ssh — the credential the consumer logs in with.
+      # user over ssh, the way the consumer logs in.
       - name: Test Image (vax)
         if: matrix.architecture.name == 'vax'
         run: |
           set -eux
-          sudo apt-get install -y sshpass
 
           zstd -dc "output/netbsd-${{ matrix.version }}-vax.img.zst" > disk.raw
 
@@ -291,10 +290,18 @@ jobs:
           # runners. Attempts while the port is still closed fail
           # instantly via slirp's RST, so a long timeout doesn't slow the
           # boot-wait polling down.
+          #
+          # The secondary user has an empty password and the image's PAM
+          # stack accepts it (post_install_vax.sh), which makes the login
+          # prompt-free: sshd's keyboard-interactive method sends no prompts
+          # and the client supplies no input. Disabling the other three
+          # methods keeps this an assertion about that path rather than a
+          # login that could quietly start working some other way.
           ssh_vax() {
-            sshpass -p runner ssh -p 2222 \
+            ssh -p 2222 \
               -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-              -o PreferredAuthentications=password -o PubkeyAuthentication=no \
+              -o BatchMode=yes -o PubkeyAuthentication=no \
+              -o PasswordAuthentication=no -o GSSAPIAuthentication=no \
               -o ConnectTimeout=60 runner@127.0.0.1 "$@"
           }
 

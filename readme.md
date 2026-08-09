@@ -127,7 +127,9 @@ key generation at the emulated VAX's ~1 MIPS on the first boot.
 
 Since the FAT resources disk that delivers the SSH key to every other port
 can't be mounted on NetBSD/VAX (`msdosfs` is unavailable there), the VAX image
-is logged into with a password rather than a key, using the `runner` user and
+is logged into without a key. The `runner` user has an empty password, and both
+`sshd` and the PAM stack are configured to accept it, so the login needs no
+credential and not even a prompt. Only `runner` is passwordless; `root` keeps
 the password set during installation.
 
 ## Contributing

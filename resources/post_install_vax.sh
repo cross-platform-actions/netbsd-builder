@@ -12,12 +12,11 @@
 # process the firmware self-test passes and NetBSD boots normally.
 #
 # What we do that the SSH-based provisioners would otherwise do:
-#   - Configure sshd to allow password login (PermitRootLogin, password
-#     auth). The CI harness logs in as the secondary user with the
-#     password set during install (var_files/common.pkrvars.hcl), so we
-#     do not inject keys via the resources disk the way the other ports
-#     do. Empty-password ssh isn't an option here: NetBSD's sshd rejects
-#     it even with PermitEmptyPasswords.
+#   - Configure sshd (PermitRootLogin, password auth, empty passwords)
+#   - Give the secondary user an empty password, so the consumer logs in
+#     over ssh without a credential at all. The resources disk that
+#     delivers a generated key to every other port can't be mounted here
+#     (no msdosfs on vax), so a key is not an option.
 #   - Enable sshd at boot
 #   - Set boot loader timeout to 0
 #   - Set the hostname
@@ -59,13 +58,53 @@ install_ssh_host_keys() {
 }
 
 configure_ssh() {
+  # PermitEmptyPasswords is the first of the two gates the empty password
+  # of the secondary user has to pass; see setup_passwordless_login.
   cat <<EOF >> /mnt/etc/ssh/sshd_config
 PermitRootLogin yes
 PasswordAuthentication yes
+PermitEmptyPasswords yes
 PubkeyAuthentication yes
 UseDNS no
 AcceptEnv *
 EOF
+}
+
+# Let the secondary user log in over ssh with no credential. Three things
+# have to line up, and the login fails if any one of them is missing:
+#
+#   1. sshd passes PAM_DISALLOW_NULL_AUTHTOK to pam_authenticate() unless
+#      PermitEmptyPasswords is set (see configure_ssh).
+#   2. pam_unix accepts an empty hash only when that flag is clear *and*
+#      `nullok` is set on its auth line, otherwise it substitutes "*" and
+#      the login can never succeed. NetBSD's own /etc/pam.d/su already
+#      relies on the same option.
+#   3. The password field has to actually be empty. sysinst set one during
+#      the install, so clear it and rebuild the password databases.
+#
+# The result is prompt-free rather than merely password-free: pam_unix
+# returns success without ever calling the conversation function, so sshd's
+# keyboard-interactive method sends zero prompts and the client
+# authenticates without supplying any input.
+#
+# Only the secondary user is passwordless; root keeps the password set
+# during the install. As with the shared host keys above, the image is a
+# throwaway CI guest reachable only through the consumer's own local port
+# forward.
+setup_passwordless_login() {
+  sed -i -E '/^auth[[:space:]]+required[[:space:]]+pam_unix\.so/ s/$/ nullok/' \
+    /mnt/etc/pam.d/sshd
+
+  sed -i -E "s/^(${SECONDARY_USER}):[^:]*:/\1::/" /mnt/etc/master.passwd
+  # In the chroot so it reads and writes the target's databases, the same
+  # way install_packages runs pkg_add.
+  chroot /mnt /usr/sbin/pwd_mkdb -p /etc/master.passwd
+
+  # A substitution that matches nothing leaves sed successful, and the only
+  # other symptom is ssh timing out against a finished image an hour later.
+  # Fail the build here instead, where the reason is still on screen.
+  grep -q '^auth.*pam_unix\.so.*nullok' /mnt/etc/pam.d/sshd
+  grep -q "^${SECONDARY_USER}::" /mnt/etc/master.passwd
 }
 
 enable_sshd_at_boot() {
@@ -137,6 +176,7 @@ minimize_disk() {
 
 install_ssh_host_keys
 configure_ssh
+setup_passwordless_login
 enable_sshd_at_boot
 configure_boot_flags
 set_hostname
