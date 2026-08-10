@@ -187,7 +187,10 @@ jobs:
 
       - name: Create File
         if: matrix.architecture.name != 'vax'
-        run: echo 'host to guest' > host_to_guest.txt
+        run: |
+          echo 'host to guest' > host_to_guest.txt
+          # Read by the guest to check its clock against the host's.
+          date -u +%s > host_epoch.txt
 
       # qemu architectures are booted by cross-platform-actions/action.
       - name: Test Image
@@ -256,9 +259,48 @@ jobs:
             cat host_to_guest.txt | grep -q 'host to guest'
             echo 'guest to host' > guest_to_host.txt
 
+            # No DHCP client any more (provision.sh freezes the lease), so
+            # assert the network it ships with works rather than trusting it.
+            echo 'network:'
+            # ifconfig lives in /sbin, which isn't in the PATH of the user the
+            # commands run as.
+            PATH="/sbin:/usr/sbin:$PATH"
+            [ ! -f /var/run/dhcpcd.pid ]
+            ifconfig -l
+            netstat -rn -f inet | grep -q '^default'
+            grep -q '^nameserver' /etc/resolv.conf
+            curl -fsS -o /dev/null https://github.com
+
+            # The clock comes from the emulated RTC now. The HTTPS fetch above
+            # already proves the right year, so this only catches a large skew.
+            echo 'clock:'
+            guest_epoch=$(date -u +%s)
+            host_epoch=$(cat host_epoch.txt)
+            skew=$((guest_epoch - host_epoch))
+            echo "guest is ${skew}s ahead of the host"
+            [ "$skew" -gt -60 ] && [ "$skew" -lt 600 ]
+
+            # The per-script boot timeline, when built with boot_timestamps.
+            echo 'rc log:'
+            sudo cat /var/run/rc.log || true
+
       - name: Verify File Synchronization
         if: matrix.architecture.name != 'vax'
         run: cat guest_to_host.txt | grep -q 'guest to host'
+
+      # The action still logs in with a generated key, but the image accepts an
+      # empty password now, which is how it will log in once it stops building
+      # the resources disk. The VM above is still up (shutdown_vm: false), so
+      # assert that path directly with every other method disabled.
+      - name: Test Passwordless Login
+        if: matrix.architecture.name != 'vax'
+        run: |
+          ssh -p 2847 \
+            -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            -o BatchMode=yes -o PubkeyAuthentication=no \
+            -o PasswordAuthentication=no -o GSSAPIAuthentication=no \
+            -o ConnectTimeout=60 runner@127.0.0.1 \
+            'echo "logged in as $(whoami) without a credential"'
 
       # cross-platform-actions/action is qemu-based and can't run a VAX
       # image, so boot the built image under SIMH directly: decompress the

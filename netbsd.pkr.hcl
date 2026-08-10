@@ -169,6 +169,12 @@ variable "package_repository" {
   description = "The binary package repository to install the packages from. An empty value keeps the one the installer configured"
 }
 
+variable "boot_timestamps" {
+  default = false
+  type = bool
+  description = "Print a timestamped line to the console as every rc.d script starts, to attribute the boot time to individual scripts"
+}
+
 locals {
   iso_target_extension = "iso"
   iso_target_path = "packer_cache"
@@ -388,7 +394,8 @@ build {
     environment_vars = [
       "SECONDARY_USER=${var.secondary_user_username}",
       "BOOT_CONSOLE=${var.boot_console}",
-      "PACKAGE_REPOSITORY=${var.package_repository}"
+      "PACKAGE_REPOSITORY=${var.package_repository}",
+      "BOOT_TIMESTAMPS=${var.boot_timestamps}"
     ]
   }
 

@@ -5,6 +5,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- The `runner` user can log in over SSH without a credential on every
+    architecture, not just VAX, which lets a consumer stop building the FAT
+    resources disk that carries a generated key
+- New `boot_timestamps` build variable, which makes `/etc/rc` print a
+    timestamped line to the console as each `rc.d` script starts
+
+### Changed
+- Freeze the address the hypervisor hands out into the static network
+    configuration and disable the DHCP client, taking it off the boot path to
+    `sshd`
+- Don't run `ntpdate` at boot. It blocks the boot on network round trips to
+    correct an offset that is already close to zero, since the emulated RTC is
+    seeded from the host clock. `ntpd` stays enabled, now with `-g`
+
 ### Fixed
 - Stop the boot-time `ntpdate` being able to stall a NetBSD/VAX guest
     indefinitely. It runs inline in the boot sequence, ahead of `sshd`, and the

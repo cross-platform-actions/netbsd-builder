@@ -43,6 +43,30 @@ Except for the root user, there's one additional user, `runner`, which is the
 user that will be running the commands in the GitHub action. This user is
 allowed use `sudo` without a password.
 
+`runner` also has an empty password, which `sshd` and the PAM stack are
+configured to accept, so the image can be logged into over SSH without a
+credential and without a prompt. Only `runner` is passwordless; `root` keeps the
+password set during installation.
+
+## Boot Time
+
+The images are configured to reach a reachable `sshd` as quickly as possible,
+because a consumer waits for that on every job:
+
+* The address the hypervisor hands out is frozen into the static network
+  configuration at build time and the DHCP client is disabled. Under QEMU's user
+  mode networking the lease never changes, and `dhcpcd` is ordered before the
+  `NETWORKING` milestone, which is on the path to `sshd`.
+* `ntpdate` is not run at boot. Its `rc.d` script runs `ntpdate(8)` inline, so
+  the whole boot waits for its network round trips, and it corrects an offset
+  that is already close to zero: the hypervisor seeds the emulated RTC from the
+  host clock, and the kernel reads it as UTC. `ntpd` stays enabled, with `-g` so
+  it can step a large initial offset if one ever exists.
+
+Building with `-var boot_timestamps=true` makes `/etc/rc` print a timestamped
+line to the console as each `rc.d` script starts, which attributes the boot time
+to individual scripts. The same lines are logged to `/var/run/rc.log`.
+
 ## Architectures and Versions
 
 The following architectures and versions are supported:
@@ -125,12 +149,10 @@ That includes generating the SSH host keys on the build host and installing
 them into the image, which would otherwise cost around 20 minutes of RSA
 key generation at the emulated VAX's ~1 MIPS on the first boot.
 
-Since the FAT resources disk that delivers the SSH key to every other port
-can't be mounted on NetBSD/VAX (`msdosfs` is unavailable there), the VAX image
-is logged into without a key. The `runner` user has an empty password, and both
-`sshd` and the PAM stack are configured to accept it, so the login needs no
-credential and not even a prompt. Only `runner` is passwordless; `root` keeps
-the password set during installation.
+The FAT resources disk that delivers a generated SSH key to the other ports
+can't be mounted on NetBSD/VAX (`msdosfs` is unavailable there), which is why the
+passwordless login described above exists. Every architecture now accepts it, so
+the resources disk is no longer the only way in.
 
 ## Contributing
 
