@@ -205,6 +205,12 @@ variable "net_device" {
   description = "The type of network device to use"
 }
 
+variable "passwordless_login" {
+  default = false
+  type = bool
+  description = "If true, the secondary user is given an empty password and sshd and PAM are configured to accept it, so the image is logged into without a credential. For the architectures where the resources disk that delivers a generated SSH key can't be used"
+}
+
 variable "ssh_timeout" {
   default = "10000s"
   type = string
@@ -486,7 +492,8 @@ build {
     environment_vars = [
       "SECONDARY_USER=${var.secondary_user_username}",
       "BOOT_CONSOLE=${var.boot_console}",
-      "PACKAGE_REPOSITORY=${var.package_repository}"
+      "PACKAGE_REPOSITORY=${var.package_repository}",
+      "PASSWORDLESS_LOGIN=${var.passwordless_login}"
     ]
   }
 

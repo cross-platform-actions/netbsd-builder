@@ -15,6 +15,12 @@ post_install_disk_device = "/dev/dk1"
 // it leaves the ones on the PCI bus unconfigured.
 net_device = "virtio-net-device"
 
+// The resources disk that delivers a generated SSH key to the other
+// architectures can't be located on this one: rc.local picks the last entry of
+// `hw.disknames`, and here that is `dk1`, the root wedge of the boot disk,
+// rather than the resources disk. Log in with an empty password instead.
+passwordless_login = true
+
 // Without an entropy source the first boot generates the SSH host keys anyway
 // and only warns that they may be predictable, so this is not optional. It's
 // the MMIO transport of the same device, for the same reason as the two above.

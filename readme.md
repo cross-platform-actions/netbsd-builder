@@ -168,6 +168,16 @@ the other architectures, but under the release and the pkgsrc branch they were
 built from, which the version's variables file points at. That repository is
 also where `pkgin`, which a pre-built image doesn't have, is bootstrapped from.
 
+Like the VAX image, the RISC-V 64 image is logged into without a key. The FAT
+resources disk that delivers one to the other architectures can be attached
+here, but not found: `rc.local` picks the last entry of `hw.disknames`, and the
+RISC-V disks enumerate as `ld4` and `ld5` with the wedges of the boot disk,
+`dk0` and `dk1`, registered after both of them, so the last entry is the root
+wedge rather than the resources disk. The `runner` user has an empty password
+instead, and both `sshd` and the PAM stack are configured to accept it. Only
+`runner` is passwordless; `root` keeps the password `creds_msdos(8)` set for it,
+which is what the provisioners escalate with.
+
 ## Contributing
 
 ### Changelog

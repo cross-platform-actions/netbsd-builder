@@ -40,6 +40,48 @@ EOF
   /etc/rc.d/sshd restart
 }
 
+# Let the secondary user log in over SSH with no credential at all. Three things
+# have to line up, and the login fails if any one of them is missing:
+#
+#   1. sshd passes PAM_DISALLOW_NULL_AUTHTOK to pam_authenticate() unless
+#      PermitEmptyPasswords is set.
+#   2. pam_unix accepts an empty hash only when that flag is clear *and*
+#      `nullok` is set on its auth line, otherwise it substitutes "*" and the
+#      login can never succeed. NetBSD's own /etc/pam.d/su already relies on the
+#      same option.
+#   3. The password field has to actually be empty. creds_msdos(8) set one when
+#      it created the user, so clear it and rebuild the password databases.
+#
+# The result is prompt-free rather than merely password-free: pam_unix returns
+# success without ever calling the conversation function, so sshd's
+# keyboard-interactive method sends zero prompts and the client authenticates
+# without supplying any input. That also means the SSH session this runs in, and
+# any reconnect packer makes with the password it was given, keep working.
+#
+# Only the secondary user is passwordless; root keeps its password, which is what
+# the provisioners escalate with. The image is a throwaway CI guest reachable
+# only through the consumer's own local port forward.
+setup_passwordless_login() {
+  [ "${PASSWORDLESS_LOGIN:-false}" = 'true' ] || return 0
+
+  echo 'PermitEmptyPasswords yes' >> /etc/ssh/sshd_config
+
+  sed -i -E '/^auth[[:space:]]+required[[:space:]]+pam_unix\.so/ s/$/ nullok/' \
+    /etc/pam.d/sshd
+
+  sed -i -E "s/^(${SECONDARY_USER}):[^:]*:/\1::/" /etc/master.passwd
+  pwd_mkdb -p /etc/master.passwd
+
+  # A substitution that matches nothing leaves sed successful, and the only
+  # other symptom is SSH timing out against a finished image an hour later.
+  # Fail the build here instead, where the reason is still on screen.
+  grep -q '^PermitEmptyPasswords yes' /etc/ssh/sshd_config
+  grep -q '^auth.*pam_unix\.so.*nullok' /etc/pam.d/sshd
+  grep -q "^${SECONDARY_USER}::" /etc/master.passwd
+
+  /etc/rc.d/sshd restart
+}
+
 # The secondary user is created by sysinst, or by creds_msdos(8) for a
 # pre-built image, which doesn't create the home directory.
 setup_secondary_user() {
@@ -175,6 +217,7 @@ setup_path
 disable_heartbeat
 configure_ssh
 setup_secondary_user
+setup_passwordless_login
 
 # Configuration that only touches the file system, before anything that needs
 # the network. Nothing here depends on the packages, so it shouldn't be gated

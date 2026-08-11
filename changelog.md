@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - Added support for NetBSD on RISC-V 64
+- The NetBSD/RISC-V 64 image is logged into without a password, the way the
+  NetBSD/VAX image is
 
 ### Fixed
 - Turn off the NetBSD 11 heartbeat watchdog, which panics an emulated guest that
