@@ -7,5 +7,6 @@ vax_packages
 output
 output-*
 console.log
+.cache
 .claude/
 CLAUDE.md

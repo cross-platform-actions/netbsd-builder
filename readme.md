@@ -23,7 +23,10 @@ X components. It will install the following distribution sets:
 * X11 servers
 
 The VAX image installs the same sets except the X11 ones, since the emulated
-VAX has no framebuffer.
+VAX has no framebuffer. The RISC-V 64 image installs no sets at all: NetBSD
+publishes no installation media for the riscv port, so that image is built from
+the pre-built disk image the port publishes instead of being installed with
+sysinst, and it contains whatever that image contains.
 
 In addition to the above file sets, the following packages are installed as well:
 
@@ -79,14 +82,14 @@ to individual scripts. The same lines are logged to `/var/run/rc.log`.
 
 The following architectures and versions are supported:
 
-| Version | x86-64 | ARM64 | VAX |
-|---------|--------|-------|-----|
-| 11.0    | ✓      | ✓     | ✓   |
-| 10.1    | ✓      | ✓     | ✓   |
-| 10.0    | ✓      | ✓     | ✗   |
-| 9.4     | ✓      | ✗     | ✗   |
-| 9.3     | ✓      | ✗     | ✗   |
-| 9.2     | ✓      | ✗     | ✗   |
+| Version | x86-64 | ARM64 | RISC-V 64 | VAX |
+|---------|--------|-------|-----------|-----|
+| 11.0    | ✓      | ✓     | ✓         | ✓   |
+| 10.1    | ✓      | ✓     | ✗         | ✓   |
+| 10.0    | ✓      | ✓     | ✗         | ✗   |
+| 9.4     | ✓      | ✗     | ✗         | ✗   |
+| 9.3     | ✓      | ✗     | ✗         | ✗   |
+| 9.2     | ✓      | ✗     | ✗         | ✗   |
 
 ## Building Locally
 
@@ -94,6 +97,11 @@ The following architectures and versions are supported:
 
 * [Packer](https://www.packer.io) 1.7.2 or later
 * [QEMU](https://qemu.org)
+
+For the RISC-V 64 architecture:
+
+* [mtools](https://www.gnu.org/software/mtools/), to install the credentials in
+  the MS-DOS boot partition of the pre-built disk image
 
 For the VAX architecture, which is built by [SIMH] instead of QEMU:
 
@@ -129,9 +137,9 @@ at the path: `output/netbsd-<version>-<architecture>.tar.zst`.
 The boot loader and the kernel of the x86-64 image use the first serial port,
 `com0`, as the console. That allows the boot output to be captured when the VM
 is running without a display, which is how the GitHub action runs it. The ARM64
-image uses the serial port by default, since the QEMU `virt` machine has no
-display device at all. The VAX has a single console, the one SIMH itself
-drives, so its boot output is captured without any extra configuration.
+and RISC-V 64 images use the serial port by default, since the QEMU `virt`
+machine has no display device at all. The VAX has a single console, the one SIMH
+itself drives, so its boot output is captured without any extra configuration.
 
 Every image is distributed as a single artifact,
 `netbsd-<version>-<architecture>.tar.zst`, holding:
@@ -141,12 +149,13 @@ Every image is distributed as a single artifact,
   keep the image writable, so it compresses worse than a solid stream does, and a
   consumer pays that difference on every job. The measured numbers are in
   [action#151](https://github.com/cross-platform-actions/action/issues/151).
-* `kernel`, where the release publishes one for QEMU's `microvm` machine type.
-  That machine type has no way to boot from a disk -- the consumer hands the
-  kernel to QEMU with `-kernel` -- so it can't live inside the image. Keeping it
-  in the same artifact means the kernel and the userland it has to match can
-  never disagree, and lets a consumer decide whether it can boot the fast way by
-  looking at what it unpacked.
+* `kernel`, for the platforms the consumer boots with QEMU's `-kernel` rather
+  than from the disk. That is the `microvm` machine type on x86-64, which has no
+  way to boot from a disk, and RISC-V 64, whose port has no boot loader QEMU's
+  `virt` machine can start. Either way the kernel can't live inside the image.
+  Keeping it in the same artifact means the kernel and the userland it has to
+  match can never disagree, and lets a consumer decide whether it can boot the
+  fast way by looking at what it unpacked.
 
 The members are named generically rather than after NetBSD or the version, so
 that a consumer needs one code path for every platform that ships an image this
@@ -178,6 +187,34 @@ The passwordless login described above started with VAX, which can't mount the
 FAT disk the consumer used to deliver a generated SSH key on (`msdosfs` is
 unavailable there). Every architecture accepts it now, so there is no key and no
 disk to carry one.
+
+NetBSD publishes no installation media for the riscv port, only a pre-built disk
+image. The RISC-V 64 image is therefore not installed with sysinst like the
+other architectures: `build.sh` downloads that image and the matching kernel,
+verifies both against the `SHA512` file published next to them, and packer boots
+the image directly and only provisions it. The image is booted through QEMU's
+direct kernel boot on top of the built-in OpenSBI firmware, since the port has
+no firmware file of its own.
+
+A pre-built image has no user to log in as, so the credentials are installed in
+the MS-DOS boot partition of the image, with mtools, before it boots.
+[`creds_msdos(8)`](https://man.netbsd.org/creds_msdos.8) turns them into the
+`runner` and `root` accounts on the first boot. It cannot enable SSH logins for
+root, so packer connects as `runner` and the provisioners escalate with `su`.
+
+Two things about the machine differ from every other QEMU architecture here.
+The RISC-V kernel attaches virtio devices only through the MMIO transport and
+leaves the ones on the PCI bus unconfigured, hence `virtio-blk-device`,
+`virtio-net-device` and `virtio-rng-device` rather than their PCI counterparts.
+And the machine cannot power itself off — the kernel leaves the `poweroff`
+device unconfigured — so `poweroff` only halts it and QEMU keeps running. The
+build lets packer stop the VM instead, after the cleanup provisioner has synced
+the file systems and remounted the root read-only.
+
+The packages of the riscv port are not published under the plain release, like
+the other architectures, but under the release and the pkgsrc branch they were
+built from, which the version's variables file points at. That repository is
+also where `pkgin`, which a pre-built image doesn't have, is bootstrapped from.
 
 ## Contributing
 
