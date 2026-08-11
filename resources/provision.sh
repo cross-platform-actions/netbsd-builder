@@ -174,7 +174,8 @@ setup_passwordless_login() {
 # Stamp each rc.d script as it starts, so the time between init and sshd can be
 # attributed to individual scripts. One second resolution: NetBSD's date(1) has
 # no sub-second conversion. The line goes in front of the cmd-name metadata,
-# never between run_rc_script and the cmd-status line reporting its $?.
+# never between run_rc_script and the cmd-status line reporting its $?. The end
+# of the loop is stamped too, so the last script's own duration is accounted for.
 configure_boot_timestamps() {
   [ "${BOOT_TIMESTAMPS:-}" = 'true' ] || return 0
 
@@ -183,8 +184,12 @@ configure_boot_timestamps() {
       print "\t\tprint_rc_normal \"cpa-boot-timestamp $(date +%s) $_rc_elem\""
       patched = 1
     }
+    /print_rc_metadata "end:/ {
+      print "\tprint_rc_normal \"cpa-boot-timestamp $(date +%s) -end-of-rc\""
+      patched_end = 1
+    }
     { print }
-    END { if (!patched) exit 1 }
+    END { if (!patched || !patched_end) exit 1 }
   ' /etc/rc > /tmp/rc.timestamps
 
   # Redirect into the existing file rather than moving over it, to keep the
