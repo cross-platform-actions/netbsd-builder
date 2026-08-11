@@ -169,6 +169,54 @@ variable "package_repository" {
   description = "The binary package repository to install the packages from. An empty value keeps the one the installer configured"
 }
 
+variable "disk_image" {
+  default = false
+  type = bool
+  description = "If true, the source is a pre-built, bootable disk image instead of installation media. Nothing is installed, the image is only provisioned"
+}
+
+variable "image_path" {
+  default = ""
+  type = string
+  description = "The path to a locally prepared disk image, used instead of downloading installation media. Required when `disk_image` is true"
+}
+
+variable "kernel_path" {
+  default = ""
+  type = string
+  description = "The path to a kernel to boot through QEMU's direct kernel boot (`-kernel`). When empty, the VM boots through the firmware"
+}
+
+variable "kernel_command_line" {
+  default = ""
+  type = string
+  description = "The command line to pass to the kernel (`-append`) when booting through QEMU's direct kernel boot"
+}
+
+variable "extra_qemuargs" {
+  default = []
+  type = list(list(string))
+  description = "Additional arguments to pass to QEMU"
+}
+
+variable "net_device" {
+  default = "virtio-net"
+  type = string
+  description = "The type of network device to use"
+}
+
+variable "ssh_timeout" {
+  default = "10000s"
+  type = string
+  description = "How long to wait for SSH to become available"
+}
+
+variable "shutdown_timeout" {
+  default = "5m"
+  type = string
+  description = "How long to wait for the VM to shut down"
+}
+
 locals {
   iso_target_extension = "iso"
   iso_target_path = "packer_cache"
@@ -177,13 +225,51 @@ locals {
   image = "NetBSD-${var.os_version}-${var.architecture.image}.${local.iso_target_extension}"
   vm_name = "netbsd-${var.os_version}-${var.architecture.name}.qcow2"
   full_remote_path = "images/${var.os_version}/${local.image}?key=NetBSD"
+
+  // A pre-built image has no user configured yet. The credentials are
+  // installed before the VM boots, through creds_msdos(8), which cannot enable
+  // SSH logins for root, so connect as the secondary user and escalate to root
+  // for the provisioners.
+  ssh_username = var.disk_image ? var.secondary_user_username : "root"
+  ssh_password = var.disk_image ? var.secondary_user_password : var.root_password
+
+  become_root = "echo '${var.root_password}' | su -m root -c"
+
+  execute_command = var.disk_image ? "${local.become_root} 'chmod +x {{ .Path }}; sh -c \"{{ .Vars }} {{ .Path }}\"'" : "chmod +x {{ .Path }}; {{ .Vars }} {{ .Path }}"
+
+  // The RISC-V machine cannot power itself off: the kernel leaves the poweroff
+  // device unconfigured, so `poweroff` halts and QEMU keeps running until
+  // packer's shutdown timeout expires and fails the build. Let packer stop the
+  // VM instead; the cleanup provisioner leaves the file systems clean.
+  shutdown_command = var.disk_image ? "" : "/sbin/poweroff"
+
+  kernel_qemuargs = concat(
+    var.kernel_path == "" ? [] : [["-kernel", var.kernel_path]],
+    var.kernel_command_line == "" ? [] : [["-append", var.kernel_command_line]]
+  )
+
+  // Two things at once, both of which only the pre-built RISC-V 64 image needs:
+  // there's no installation media to attach as a second drive, and the RISC-V
+  // kernel attaches virtio devices only through the MMIO transport and leaves
+  // the ones on the PCI bus unconfigured. Split these into a variable of their
+  // own if a pre-built image ever arrives for a machine with a PCI bus.
+  disk_qemuargs = var.disk_image ? [
+    ["-device", "virtio-blk-device,drive=drive0"],
+    ["-drive", "if=none,file={{ .OutputDir }}/{{ .Name }},id=drive0,cache=writeback,discard=ignore,format=qcow2"]
+  ] : [
+    ["-device", "virtio-scsi-pci"],
+    ["-device", "scsi-hd,drive=drive0,bootindex=0"],
+    ["-device", "scsi-cd,drive=drive1,bootindex=1"],
+    ["-drive", "if=none,file={{ .OutputDir }}/{{ .Name }},id=drive0,cache=writeback,discard=ignore,format=qcow2"],
+    ["-drive", "if=none,file=${local.iso_full_target_path},id=drive1,media=disk,format=raw,readonly=on"]
+  ]
 }
 
 source "qemu" "qemu" {
   machine_type = var.machine_type
   cpus = var.cpus
   memory = var.memory
-  net_device = "virtio-net"
+  net_device = var.net_device
 
   disk_compression = true
   disk_interface = "virtio"
@@ -199,7 +285,9 @@ source "qemu" "qemu" {
 
   boot_wait = "10s"
 
-  boot_steps = concat(
+  // A pre-built disk image boots straight into a running system, there's no
+  // installer to drive.
+  boot_steps = var.disk_image ? [] : concat(
     [
       ["1<wait20s>", "Boot normally"], // for x86-64, the boot delay is already over
       ["a<enter><wait5>", "Installation messages in English"]
@@ -309,52 +397,60 @@ source "qemu" "qemu" {
     ]
   )
 
-  ssh_username = "root"
-  ssh_password = var.root_password
-  ssh_timeout = "10000s"
+  ssh_username = local.ssh_username
+  ssh_password = local.ssh_password
+  ssh_timeout = var.ssh_timeout
 
-  qemuargs = [
-    ["-cpu", var.cpu_type],
-    ["-boot", "strict=off"],
-    ["-monitor", "none"],
-    # When the installer goes out of step the only symptom is packer waiting
-    # for an SSH server that never appears, so log the console to make that
-    # diagnosable.
-    #
-    # This has to stay a virtual console rather than become `file:`. On the
-    # platforms without a display device, the ARM64 one here, the installer's
-    # console is the serial port, and it reads the keystrokes packer types from
-    # it. A `file:` serial port only writes, so redirecting it there leaves the
-    # installer with no input at all and it never gets past its first screen.
-    # A chardev keeps the virtual console, and with it packer's input, while
-    # also writing everything to a file.
-    #
-    # The log is not in the output directory: packer refuses to start when that
-    # directory already exists and isn't empty, so a log left behind by a
-    # previous run would break the next one.
-    ["-chardev", "vc,id=console0,logfile=console.log"],
-    ["-serial", "chardev:console0"],
-    ["-accel", "hvf"],
-    ["-accel", "kvm"],
-    ["-accel", "tcg"],
-    ["-device", "virtio-scsi-pci"],
-    ["-device", "scsi-hd,drive=drive0,bootindex=0"],
-    ["-device", "scsi-cd,drive=drive1,bootindex=1"],
-    ["-drive", "if=none,file={{ .OutputDir }}/{{ .Name }},id=drive0,cache=writeback,discard=ignore,format=qcow2"],
-    ["-drive", "if=none,file=${local.iso_full_target_path},id=drive1,media=disk,format=raw,readonly=on"],
-    ["-netdev", "user,id=user.0,hostfwd=tcp::{{ .SSHHostPort }}-:22,ipv6=off"]
-  ]
+  qemuargs = concat(
+    [
+      ["-cpu", var.cpu_type],
+      ["-boot", "strict=off"],
+      ["-monitor", "none"],
+      # When the installer goes out of step the only symptom is packer waiting
+      # for an SSH server that never appears, so log the console to make that
+      # diagnosable.
+      #
+      # This has to stay a virtual console rather than become `file:`. On the
+      # platforms without a display device, the ARM64 and RISC-V ones here, the
+      # installer's console is the serial port, and it reads the keystrokes
+      # packer types from it. A `file:` serial port only writes, so redirecting
+      # it there leaves the installer with no input at all and it never gets
+      # past its first screen. A chardev keeps the virtual console, and with it
+      # packer's input, while also writing everything to a file.
+      #
+      # The log is not in the output directory: packer refuses to start when
+      # that directory already exists and isn't empty, so a log left behind by
+      # a previous run would break the next one.
+      ["-chardev", "vc,id=console0,logfile=console.log"],
+      ["-serial", "chardev:console0"],
+      ["-accel", "hvf"],
+      ["-accel", "kvm"],
+      ["-accel", "tcg"]
+    ],
 
-  iso_checksum = var.checksum
+    local.kernel_qemuargs,
+    local.disk_qemuargs,
+    var.extra_qemuargs,
+
+    [
+      ["-netdev", "user,id=user.0,hostfwd=tcp::{{ .SSHHostPort }}-:22,ipv6=off"]
+    ]
+  )
+
+  disk_image = var.disk_image
+  iso_checksum = var.disk_image ? "none" : var.checksum
   iso_target_extension = local.iso_target_extension
-  iso_target_path = local.iso_target_path
+  // A pre-built image is not verified by packer, it's verified by `build.sh`.
+  // Cache it per version and architecture, since the checksum packer otherwise
+  // names the cached file after is the same for all of them.
+  iso_target_path = var.disk_image ? "${local.iso_target_path}/${var.os_version}-${var.architecture.name}" : local.iso_target_path
   # Old releases are moved off the main site to archive.netbsd.org,
   # where cdn/ftp then redirect to a directory URL — the download gets
   # an HTML "Document Moved" page and fails the checksum. The archive
   # mirrors the images/<version>/ layout, so one archive URL covers
   # every moved release; for current releases it just 404s and packer
   # falls through to the mirrors below.
-  iso_urls = [
+  iso_urls = var.disk_image ? [var.image_path] : [
     "https://archive.netbsd.org/pub/NetBSD-archive/${local.full_remote_path}",
     "https://cdn.netbsd.org/pub/NetBSD/${local.full_remote_path}",
     "https://ftp.netbsd.org/pub/NetBSD/${local.full_remote_path}",
@@ -367,7 +463,8 @@ source "qemu" "qemu" {
 
   http_directory = "."
   output_directory = "output"
-  shutdown_command = "/sbin/poweroff"
+  shutdown_command = local.shutdown_command
+  shutdown_timeout = var.shutdown_timeout
   vm_name = local.vm_name
 }
 
@@ -385,6 +482,7 @@ build {
 
   provisioner "shell" {
     script = "resources/provision.sh"
+    execute_command = local.execute_command
     environment_vars = [
       "SECONDARY_USER=${var.secondary_user_username}",
       "BOOT_CONSOLE=${var.boot_console}",
@@ -394,6 +492,7 @@ build {
 
   provisioner "shell" {
     script = "resources/custom.sh"
+    execute_command = local.execute_command
     environment_vars = [
       "SECONDARY_USER=${var.secondary_user_username}"
     ]
@@ -401,5 +500,9 @@ build {
 
   provisioner "shell" {
     script = "resources/cleanup.sh"
+    execute_command = local.execute_command
+    environment_vars = [
+      "UNMOUNT_FILE_SYSTEMS=${var.disk_image}"
+    ]
   }
 }

@@ -23,7 +23,10 @@ X components. It will install the following distribution sets:
 * X11 servers
 
 The VAX image installs the same sets except the X11 ones, since the emulated
-VAX has no framebuffer.
+VAX has no framebuffer. The RISC-V 64 image installs no sets at all: NetBSD
+publishes no installation media for the riscv port, so that image is built from
+the pre-built disk image the port publishes instead of being installed with
+sysinst, and it contains whatever that image contains.
 
 In addition to the above file sets, the following packages are installed as well:
 
@@ -47,14 +50,14 @@ allowed use `sudo` without a password.
 
 The following architectures and versions are supported:
 
-| Version | x86-64 | ARM64 | VAX |
-|---------|--------|-------|-----|
-| 11.0    | ✓      | ✓     | ✓   |
-| 10.1    | ✓      | ✓     | ✓   |
-| 10.0    | ✓      | ✓     | ✗   |
-| 9.4     | ✓      | ✗     | ✗   |
-| 9.3     | ✓      | ✗     | ✗   |
-| 9.2     | ✓      | ✗     | ✗   |
+| Version | x86-64 | ARM64 | RISC-V 64 | VAX |
+|---------|--------|-------|-----------|-----|
+| 11.0    | ✓      | ✓     | ✓         | ✓   |
+| 10.1    | ✓      | ✓     | ✗         | ✓   |
+| 10.0    | ✓      | ✓     | ✗         | ✗   |
+| 9.4     | ✓      | ✗     | ✗         | ✗   |
+| 9.3     | ✓      | ✗     | ✗         | ✗   |
+| 9.2     | ✓      | ✗     | ✗         | ✗   |
 
 ## Building Locally
 
@@ -62,6 +65,11 @@ The following architectures and versions are supported:
 
 * [Packer](https://www.packer.io) 1.7.2 or later
 * [QEMU](https://qemu.org)
+
+For the RISC-V 64 architecture:
+
+* [mtools](https://www.gnu.org/software/mtools/), to install the credentials in
+  the MS-DOS boot partition of the pre-built disk image
 
 For the VAX architecture, which is built by [SIMH] instead of QEMU:
 
@@ -98,9 +106,9 @@ compressed RAW image instead: `output/netbsd-<version>-vax.img.zst`.
 The boot loader and the kernel of the x86-64 image use the first serial port,
 `com0`, as the console. That allows the boot output to be captured when the VM
 is running without a display, which is how the GitHub action runs it. The ARM64
-image uses the serial port by default, since the QEMU `virt` machine has no
-display device at all. The VAX has a single console, the one SIMH itself
-drives, so its boot output is captured without any extra configuration.
+and RISC-V 64 images use the serial port by default, since the QEMU `virt`
+machine has no display device at all. The VAX has a single console, the one SIMH
+itself drives, so its boot output is captured without any extra configuration.
 
 The qcow2 format is chosen because unused space doesn't take up any space on
 disk, it's compressible and easily converts the raw format.
@@ -131,6 +139,34 @@ is logged into without a key. The `runner` user has an empty password, and both
 `sshd` and the PAM stack are configured to accept it, so the login needs no
 credential and not even a prompt. Only `runner` is passwordless; `root` keeps
 the password set during installation.
+
+NetBSD publishes no installation media for the riscv port, only a pre-built disk
+image. The RISC-V 64 image is therefore not installed with sysinst like the
+other architectures: `build.sh` downloads that image and the matching kernel,
+verifies both against the `SHA512` file published next to them, and packer boots
+the image directly and only provisions it. The image is booted through QEMU's
+direct kernel boot on top of the built-in OpenSBI firmware, since the port has
+no firmware file of its own.
+
+A pre-built image has no user to log in as, so the credentials are installed in
+the MS-DOS boot partition of the image, with mtools, before it boots.
+[`creds_msdos(8)`](https://man.netbsd.org/creds_msdos.8) turns them into the
+`runner` and `root` accounts on the first boot. It cannot enable SSH logins for
+root, so packer connects as `runner` and the provisioners escalate with `su`.
+
+Two things about the machine differ from every other QEMU architecture here.
+The RISC-V kernel attaches virtio devices only through the MMIO transport and
+leaves the ones on the PCI bus unconfigured, hence `virtio-blk-device`,
+`virtio-net-device` and `virtio-rng-device` rather than their PCI counterparts.
+And the machine cannot power itself off — the kernel leaves the `poweroff`
+device unconfigured — so `poweroff` only halts it and QEMU keeps running. The
+build lets packer stop the VM instead, after the cleanup provisioner has synced
+the file systems and remounted the root read-only.
+
+The packages of the riscv port are not published under the plain release, like
+the other architectures, but under the release and the pkgsrc branch they were
+built from, which the version's variables file points at. That repository is
+also where `pkgin`, which a pre-built image doesn't have, is bootstrapped from.
 
 ## Contributing
 

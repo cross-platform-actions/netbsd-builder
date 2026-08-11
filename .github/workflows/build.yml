@@ -42,7 +42,9 @@ jobs:
 
           # NetBSD/VAX is built by the SIMH plugin, not qemu, so it can't
           # be part of the architecture list above — add one extra job per
-          # version that has a vax var file.
+          # version that has a vax var file. The riscv port is only released
+          # from NetBSD 11.0 onwards, so it gets an extra job as well rather
+          # than an exclude per older version.
           include:
             - version: '10.1'
               architecture:
@@ -53,6 +55,13 @@ jobs:
               architecture:
                 name: vax
                 uname: vax
+
+            - version: '11.0'
+              architecture:
+                name: riscv64
+                qemu: misc
+                qemu_executable: riscv64
+                uname: riscv64
 
           exclude:
             - version: 9.2
@@ -79,7 +88,9 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt update
-          sudo apt install -y fdisk dosfstools rsync curl python3
+          # mtools installs the credentials in the MS-DOS boot partition of a
+          # pre-built disk image (riscv64).
+          sudo apt install -y fdisk dosfstools mtools rsync curl python3
 
           # qemu only for the qemu-backed architectures; vax uses SIMH.
           if [ -n '${{ matrix.architecture.qemu }}' ]; then
@@ -146,8 +157,8 @@ jobs:
       # `<vm_name>.console.tee.log` mirrored as it reads the console, both on
       # by default. So match all of them rather than one fixed path.
       #
-      # Expect real content for ARM64 and VAX, whose console is the serial
-      # port: they log the whole install, from the firmware to `login:`. On
+      # Expect real content for ARM64, RISC-V 64 and VAX, whose console is the
+      # serial port: they log the whole boot, from the firmware to `login:`. On
       # x86-64 the console is the display instead, and the single boot from
       # disk during a build happens before provision.sh sets `consdev`, so
       # nothing is written to the serial port and the log holds just QEMU's
@@ -181,17 +192,21 @@ jobs:
             output/*.console.tee.log
           if-no-files-found: warn
 
+      # riscv64 is skipped by the four steps below until
+      # cross-platform-actions/action has a release that supports NetBSD on
+      # riscv64; it resolves the image by release tag, so there is nothing for
+      # it to boot yet.
       - name: Start Local HTTP Server
-        if: matrix.architecture.name != 'vax'
+        if: matrix.architecture.name != 'vax' && matrix.architecture.name != 'riscv64'
         run: python3 -m http.server 8080 --directory output &
 
       - name: Create File
-        if: matrix.architecture.name != 'vax'
+        if: matrix.architecture.name != 'vax' && matrix.architecture.name != 'riscv64'
         run: echo 'host to guest' > host_to_guest.txt
 
       # qemu architectures are booted by cross-platform-actions/action.
       - name: Test Image
-        if: matrix.architecture.name != 'vax'
+        if: matrix.architecture.name != 'vax' && matrix.architecture.name != 'riscv64'
         uses: cross-platform-actions/action@master
         with:
           operating_system: netbsd
@@ -257,7 +272,7 @@ jobs:
             echo 'guest to host' > guest_to_host.txt
 
       - name: Verify File Synchronization
-        if: matrix.architecture.name != 'vax'
+        if: matrix.architecture.name != 'vax' && matrix.architecture.name != 'riscv64'
         run: cat guest_to_host.txt | grep -q 'guest to host'
 
       # cross-platform-actions/action is qemu-based and can't run a VAX

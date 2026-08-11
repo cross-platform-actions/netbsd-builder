@@ -23,6 +23,49 @@ disable_heartbeat() {
   echo 'kern.heartbeat.max_period=0' >> /etc/sysctl.conf
 }
 
+# For an installation performed by sysinst this is done by
+# `resources/post_install.sh`, before the first boot. A pre-built image boots
+# with the stock configuration, which lets nobody in over SSH.
+configure_ssh() {
+  grep -q '^PermitRootLogin yes' /etc/ssh/sshd_config && return 0
+
+  cat <<EOF >> /etc/ssh/sshd_config
+PermitRootLogin yes
+PasswordAuthentication yes
+PubkeyAuthentication yes
+UseDNS no
+AcceptEnv *
+EOF
+
+  /etc/rc.d/sshd restart
+}
+
+# The secondary user is created by sysinst, or by creds_msdos(8) for a
+# pre-built image, which doesn't create the home directory.
+setup_secondary_user() {
+  home="/home/$SECONDARY_USER"
+  [ -d "$home" ] && return 0
+
+  mkdir -p "$home"
+  chown "$SECONDARY_USER" "$home"
+}
+
+# sysinst installs pkgin as part of the installation. A pre-built image, which
+# is not installed through sysinst, needs it bootstrapped first. A port whose
+# official mirrors carry no prebuilt pkgsrc binaries has nothing to bootstrap
+# from, which install_extra_packages handles.
+install_pkgin() {
+  command -v pkgin > /dev/null 2>&1 && return 0
+
+  # The repository of the port has to be known here: `pkg_add` has no
+  # configuration to read it from yet, that's what configure_package_repository
+  # sets up once pkgin exists.
+  [ -n "$PACKAGE_REPOSITORY" ] || return 0
+
+  PKG_PATH="$PACKAGE_REPOSITORY" pkg_add -U pkgin ||
+    echo "failed to bootstrap pkgin from $PACKAGE_REPOSITORY"
+}
+
 # The repository the installer configures is the one for the release, which
 # tracks whatever pkgsrc branch is current. When a bulk build for that branch
 # is only partly finished, the published package index is missing packages that
@@ -39,14 +82,18 @@ configure_package_repository() {
 }
 
 install_extra_packages() {
+  install_pkgin
+
   # On a port whose official mirrors carry no prebuilt pkgsrc binaries, the
-  # sysinst-time "Enable installation of binary packages" step is skipped, so
-  # pkgin never gets installed. Skip the package install cleanly in that case.
+  # sysinst-time "Enable installation of binary packages" step is skipped and
+  # the bootstrap above has nothing to fetch, so pkgin never gets installed.
+  # Skip the package install cleanly in that case.
   if ! command -v pkgin >/dev/null 2>&1; then
     echo "pkgin not available on this port; skipping extra package install"
     return 0
   fi
 
+  configure_package_repository
   pkgin -y install bash curl rsync sudo
 }
 
@@ -126,6 +173,8 @@ set_hostname() {
 
 setup_path
 disable_heartbeat
+configure_ssh
+setup_secondary_user
 
 # Configuration that only touches the file system, before anything that needs
 # the network. Nothing here depends on the packages, so it shouldn't be gated
@@ -135,6 +184,5 @@ configure_boot_console
 configure_boot_scripts
 set_hostname
 
-configure_package_repository
 install_extra_packages
 setup_sudo
