@@ -271,10 +271,15 @@ jobs:
             grep -q '^nameserver' /etc/resolv.conf
             curl -fsS -o /dev/null https://github.com
 
-            # /etc/rc.d/network no longer waits for an IPv6 duplicate address
-            # detection that nothing can satisfy. Assert the wait didn't run:
-            # it announces itself on the console, and /etc/rc logs that.
-            ifconfig "$(route -n get default | awk '$1 == "interface:" { print $2 }')" inet
+            # Duplicate address detection is off, so the address is usable as
+            # soon as it is configured and rc doesn't wait for it. Assert the
+            # probe count, the absence of a `tentative` flag, and that the wait
+            # never ran -- it announces itself on the console, which rc logs.
+            [ "$(sysctl -n net.inet.ip.dad_count)" -eq 0 ]
+            [ "$(sysctl -n net.inet6.ip6.dad_count)" -eq 0 ]
+            interface=$(route -n get default | awk '$1 == "interface:" { print $2 }')
+            ifconfig "$interface" inet
+            ! ifconfig "$interface" inet | grep -q tentative
             ! sudo grep -q 'duplicate address detection' /var/run/rc.log
 
             # The clock comes from the emulated RTC now. The HTTPS fetch above

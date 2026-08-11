@@ -113,10 +113,9 @@ configure_network() {
   rm -f "/etc/ifconfig.$interface"
 
   # /etc/rc.d/network ends with `ifconfig $ifconfig_wait_dad_flags`, defaulting
-  # to `-w 15 -W 5`. The `-W 5` waits for the `detached` flag to clear, which
-  # nothing can satisfy: the consumer runs the guest with IPv6 off, so no router
-  # is ever advertised. That was 6 of the 7 seconds rc took. An empty value
-  # makes the wait a no-op; `-w 1` would keep it bounded instead.
+  # to `-w 15 -W 5`. Neither wait is wanted: `-W 5` waits for the `detached`
+  # flag, which nothing can satisfy with IPv6 off, and waiting for `tentative`
+  # only moves a cost that disable_duplicate_address_detection removes instead.
   cat <<EOF >> /etc/rc.conf
 ifconfig_$interface="$address"
 defaultroute="$gateway"
@@ -131,6 +130,22 @@ EOF
   # pre-DHCP /etc/resolv.conf. Keep a copy it doesn't know about, which
   # configure_boot_scripts restores at boot if that happened.
   cp /etc/resolv.conf "$RESOLV_BACKUP"
+}
+
+# An address is unusable while the kernel probes the link for another host
+# holding it: it keeps the `tentative` flag and the kernel drops packets
+# addressed to it, so sshd accepts nothing despite listening since rc started
+# it. NetBSD does this for IPv4 too (RFC 5227) and it took around 7 seconds.
+#
+# Nothing can be found here -- the address comes from the hypervisor's user mode
+# network, a private segment with one guest on it -- so set the probe count to
+# zero, which clears the flag immediately. /etc/rc.d/sysctl runs long before
+# /etc/rc.d/network, so this is in effect by the time the interface is up.
+disable_duplicate_address_detection() {
+  cat <<EOF >> /etc/sysctl.conf
+net.inet.ip.dad_count=0
+net.inet6.ip6.dad_count=0
+EOF
 }
 
 # ntpdate's rc.d script runs it inline, so the boot waits for network round
@@ -249,6 +264,7 @@ configure_boot_flags
 configure_boot_console
 configure_boot_timestamps
 configure_network
+disable_duplicate_address_detection
 configure_time_sync
 setup_passwordless_login
 configure_boot_scripts

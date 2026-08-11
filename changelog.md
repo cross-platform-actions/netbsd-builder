@@ -19,9 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Don't run `ntpdate` at boot. It blocks the boot on network round trips to
     correct an offset that is already close to zero, since the emulated RTC is
     seeded from the host clock. `ntpd` stays enabled, now with `-g`
-- Don't wait for IPv6 duplicate address detection in `/etc/rc.d/network`. Part of
-    that wait can never be satisfied behind user mode networking with IPv6
-    switched off, and it was the largest single item in the boot
+- Don't do duplicate address detection at all, and don't wait for it in
+    `/etc/rc.d/network`. An address is unusable while it is probed, so `sshd`
+    answered nothing for several seconds after it started listening. There is no
+    second host on the hypervisor's user mode network that could hold the
+    address
 
 ### Fixed
 - Stop the boot-time `ntpdate` being able to stall a NetBSD/VAX guest

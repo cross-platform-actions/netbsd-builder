@@ -62,11 +62,14 @@ because a consumer waits for that on every job:
   that is already close to zero: the hypervisor seeds the emulated RTC from the
   host clock, and the kernel reads it as UTC. `ntpd` stays enabled, with `-g` so
   it can step a large initial offset if one ever exists.
-* `/etc/rc.d/network` doesn't wait for IPv6 duplicate address detection
-  (`ifconfig_wait_dad_flags=""`). Its default `-w 15 -W 5` waits up to 5 seconds
-  for the `detached` flag to clear, which never happens when the guest runs
-  behind user mode networking with IPv6 switched off, so it spent that time on
-  every boot.
+* Duplicate address detection is off (`net.inet.ip.dad_count=0`,
+  `net.inet6.ip6.dad_count=0`), and `/etc/rc.d/network` doesn't wait for it
+  (`ifconfig_wait_dad_flags=""`). An address is unusable while it is being
+  probed, so the kernel drops everything addressed to it and `sshd` answers
+  nothing even though it is already listening -- which is what gated a job
+  starting. NetBSD probes for IPv4 too (RFC 5227) and the schedule takes several
+  seconds. There is nothing to find: the address comes from the hypervisor's own
+  user mode network, with exactly one guest on it.
 
 Building with `-var boot_timestamps=true` makes `/etc/rc` print a timestamped
 line to the console as each `rc.d` script starts, which attributes the boot time
