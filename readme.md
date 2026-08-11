@@ -62,6 +62,11 @@ because a consumer waits for that on every job:
   that is already close to zero: the hypervisor seeds the emulated RTC from the
   host clock, and the kernel reads it as UTC. `ntpd` stays enabled, with `-g` so
   it can step a large initial offset if one ever exists.
+* `/etc/rc.d/network` doesn't wait for IPv6 duplicate address detection
+  (`ifconfig_wait_dad_flags=""`). Its default `-w 15 -W 5` waits up to 5 seconds
+  for the `detached` flag to clear, which never happens when the guest runs
+  behind user mode networking with IPv6 switched off, so it spent that time on
+  every boot.
 
 Building with `-var boot_timestamps=true` makes `/etc/rc` print a timestamped
 line to the console as each `rc.d` script starts, which attributes the boot time

@@ -271,6 +271,12 @@ jobs:
             grep -q '^nameserver' /etc/resolv.conf
             curl -fsS -o /dev/null https://github.com
 
+            # /etc/rc.d/network no longer waits for an IPv6 duplicate address
+            # detection that nothing can satisfy. Assert the wait didn't run:
+            # it announces itself on the console, and /etc/rc logs that.
+            ifconfig "$(route -n get default | awk '$1 == "interface:" { print $2 }')" inet
+            ! sudo grep -q 'duplicate address detection' /var/run/rc.log
+
             # The clock comes from the emulated RTC now. The HTTPS fetch above
             # already proves the right year, so this only catches a large skew.
             echo 'clock:'

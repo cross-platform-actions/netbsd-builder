@@ -112,10 +112,16 @@ configure_network() {
   # for an interface still configured as `dhcp`, precisely when it is disabled.
   rm -f "/etc/ifconfig.$interface"
 
+  # /etc/rc.d/network ends with `ifconfig $ifconfig_wait_dad_flags`, defaulting
+  # to `-w 15 -W 5`. The `-W 5` waits for the `detached` flag to clear, which
+  # nothing can satisfy: the consumer runs the guest with IPv6 off, so no router
+  # is ever advertised. That was 6 of the 7 seconds rc took. An empty value
+  # makes the wait a no-op; `-w 1` would keep it bounded instead.
   cat <<EOF >> /etc/rc.conf
 ifconfig_$interface="$address"
 defaultroute="$gateway"
 dhcpcd=NO
+ifconfig_wait_dad_flags=""
 EOF
 
   echo "$nameservers" > /etc/resolv.conf
