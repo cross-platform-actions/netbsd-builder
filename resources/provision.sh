@@ -7,6 +7,22 @@ setup_path() {
   export PATH
 }
 
+# NetBSD 11 panics when a CPU hasn't checked in with the heartbeat watchdog for
+# a few seconds:
+#
+#     panic: cpu1[118 ioflush]: heart stopped beating
+#
+# An emulated CPU is regularly starved for that long, under heavy I/O or when
+# the host is busy, and the watchdog has no way to tell that apart from a
+# genuinely wedged CPU. The guests here are emulated throughout, so turn it
+# off. The sysctl only exists from NetBSD 11 onwards.
+disable_heartbeat() {
+  sysctl -n kern.heartbeat.max_period > /dev/null 2>&1 || return 0
+
+  sysctl -w kern.heartbeat.max_period=0
+  echo 'kern.heartbeat.max_period=0' >> /etc/sysctl.conf
+}
+
 # The repository the installer configures is the one for the release, which
 # tracks whatever pkgsrc branch is current. When a bulk build for that branch
 # is only partly finished, the published package index is missing packages that
@@ -109,6 +125,7 @@ set_hostname() {
 }
 
 setup_path
+disable_heartbeat
 
 # Configuration that only touches the file system, before anything that needs
 # the network. Nothing here depends on the packages, so it shouldn't be gated
