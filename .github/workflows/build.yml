@@ -135,6 +135,11 @@ jobs:
             '${{ matrix.architecture.name }}' \
             $extra_args
 
+      # packer keeps the ISO in the workspace, which the action synchronizes
+      # into the guest: half a gigabyte with no use there.
+      - name: Remove the install media
+        run: rm -rf packer_cache
+
       # When the install goes wrong, packer only reports that it gave up
       # waiting for SSH. The guest console says what actually happened.
       #
@@ -216,6 +221,9 @@ jobs:
             printf 'whoami: '; whoami
             printf 'hostname: '; hostname
             echo 'ls -lah:'; ls -lah
+            # What the synchronization actually carried in. The workspace holds
+            # the built image as well as the checkout, so this is worth seeing.
+            printf 'du -sh .: '; du -sh .
             echo 'env | sort:'; env | sort
             [ "`uname -s`" = 'NetBSD' ]
             [ "`uname -r`" = '${{ matrix.version }}' ]
