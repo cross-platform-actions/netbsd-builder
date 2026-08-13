@@ -181,7 +181,7 @@ locals {
   iso_full_target_path = "${local.iso_target_path}/${sha1(var.checksum)}.${local.iso_target_extension}"
 
   image = "NetBSD-${var.os_version}-${var.architecture.image}.${local.iso_target_extension}"
-  vm_name = "netbsd-${var.os_version}-${var.architecture.name}.qcow2"
+  vm_name = "netbsd-${var.os_version}-${var.architecture.name}.img"
   full_remote_path = "images/${var.os_version}/${local.image}?key=NetBSD"
 }
 
@@ -191,10 +191,13 @@ source "qemu" "qemu" {
   memory = var.memory
   net_device = "virtio-net"
 
-  disk_compression = true
   disk_interface = "virtio"
   disk_size = var.disk_size
-  format = "qcow2"
+
+  # RAW, because that is what gets distributed (compressed with zstd, see
+  # build.sh). Asking the builder for it directly avoids converting the image
+  # afterwards. disk_compression is a qcow2-only option, so it's gone with it.
+  format = "raw"
 
   headless = var.headless
   use_default_display = var.use_default_display
@@ -346,7 +349,7 @@ source "qemu" "qemu" {
     ["-device", "virtio-scsi-pci"],
     ["-device", "scsi-hd,drive=drive0,bootindex=0"],
     ["-device", "scsi-cd,drive=drive1,bootindex=1"],
-    ["-drive", "if=none,file={{ .OutputDir }}/{{ .Name }},id=drive0,cache=writeback,discard=ignore,format=qcow2"],
+    ["-drive", "if=none,file={{ .OutputDir }}/{{ .Name }},id=drive0,cache=writeback,discard=ignore,format=raw"],
     ["-drive", "if=none,file=${local.iso_full_target_path},id=drive1,media=disk,format=raw,readonly=on"],
     ["-netdev", "user,id=user.0,hostfwd=tcp::{{ .SSHHostPort }}-:22,ipv6=off"]
   ]

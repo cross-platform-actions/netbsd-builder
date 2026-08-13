@@ -122,8 +122,7 @@ For the VAX architecture, which is built by [SIMH] instead of QEMU:
     architectures available in the above table.
 
 The above command will build the VM image and the resulting disk image will be
-at the path: `output/netbsd-9.2-x86-64.qcow2`. For VAX the artifact is the
-compressed RAW image instead: `output/netbsd-<version>-vax.img.zst`.
+at the path: `output/netbsd-<version>-<architecture>.tar.zst`.
 
 ## Additional Information
 
@@ -134,17 +133,35 @@ image uses the serial port by default, since the QEMU `virt` machine has no
 display device at all. The VAX has a single console, the one SIMH itself
 drives, so its boot output is captured without any extra configuration.
 
-The qcow2 format is chosen because unused space doesn't take up any space on
-disk, it's compressible and easily converts the raw format.
+Every image is distributed as a single artifact,
+`netbsd-<version>-<architecture>.tar.zst`, holding:
 
-The VAX image is a RAW disk, the format SIMH attaches with the least runtime
-overhead, so it gets none of qcow2's compression. It's compressed with zstd for
-distribution instead, which brings the 1.5 GB RA92 disk down to roughly 90 MB.
-The window size is kept at zstd's default decompression limit, so no extra
-flags are needed to decompress it:
+* `disk.img`, the RAW disk. Every builder is asked for RAW directly, so nothing
+  has to be converted afterwards. qcow2 is not used: its own compression has to
+  keep the image writable, so it compresses worse than a solid stream does, and a
+  consumer pays that difference on every job. The measured numbers are in
+  [action#151](https://github.com/cross-platform-actions/action/issues/151).
+* `kernel`, where the release publishes one for QEMU's `microvm` machine type.
+  That machine type has no way to boot from a disk -- the consumer hands the
+  kernel to QEMU with `-kernel` -- so it can't live inside the image. Keeping it
+  in the same artifact means the kernel and the userland it has to match can
+  never disagree, and lets a consumer decide whether it can boot the fast way by
+  looking at what it unpacked.
+
+The members are named generically rather than after NetBSD or the version, so
+that a consumer needs one code path for every platform that ships an image this
+way.
+
+The image's zero ranges are turned into actual holes before it is archived, and
+the tar records those holes rather than the zeroes in them, so neither end has to
+read or write the full 12 GB -- only the ~700 MB the installation uses. That
+matters most to the consumer, which writes the image out on every job: without
+it, unpacking took 47 seconds against the 4 the qcow2 conversion needed. The
+compression window is kept at zstd's default decompression limit, so no extra
+flags are needed to unpack it:
 
 ```
-curl -sL <url>/netbsd-<version>-vax.img.zst | zstd -dc > disk.raw
+curl -sL <url>/netbsd-<version>-<architecture>.tar.zst | zstd -dc | tar -x
 ```
 
 The VAX image is also provisioned differently. The KA655 firmware's self-test

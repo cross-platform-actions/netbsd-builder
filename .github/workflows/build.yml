@@ -79,7 +79,7 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt update
-          sudo apt install -y fdisk dosfstools rsync curl python3
+          sudo apt install -y fdisk dosfstools rsync curl python3 zstd
 
           # qemu only for the qemu-backed architectures; vax uses SIMH.
           if [ -n '${{ matrix.architecture.qemu }}' ]; then
@@ -200,7 +200,7 @@ jobs:
           operating_system: netbsd
           architecture: ${{ matrix.architecture.name }}
           version: '${{ matrix.version }}'
-          image_url: http://localhost:8080/netbsd-${{ matrix.version }}-${{ matrix.architecture.name }}.qcow2
+          image_url: http://localhost:8080/netbsd-${{ matrix.version }}-${{ matrix.architecture.name }}.tar.zst
           shutdown_vm: false
           shell: bash
           run: |
@@ -314,22 +314,22 @@ jobs:
             'echo "logged in as $(whoami) without a credential"'
 
       # cross-platform-actions/action is qemu-based and can't run a VAX
-      # image, so boot the built image under SIMH directly: decompress the
-      # distributed artifact to RAW (what a consumer does), autoboot the
-      # disk via EXPECT/SEND, wait for sshd, and run uname as the secondary
-      # user over ssh, the way the consumer logs in.
+      # image, so boot the built image under SIMH directly: unpack the
+      # distributed bundle (what a consumer does), autoboot the disk it holds
+      # via EXPECT/SEND, wait for sshd, and run uname as the secondary user
+      # over ssh, the way the consumer logs in.
       - name: Test Image (vax)
         if: matrix.architecture.name == 'vax'
         run: |
           set -eux
 
-          zstd -dc "output/netbsd-${{ matrix.version }}-vax.img.zst" > disk.raw
+          zstd -dc "output/netbsd-${{ matrix.version }}-vax.tar.zst" | tar -x
 
           # Autoboot the disk hands-free; forward host 2222 -> guest ssh.
           {
             echo "set cpu 64m"
             echo "set rq0 ra92"
-            echo "attach rq0 disk.raw"
+            echo "attach rq0 disk.img"
             echo "attach xq nat:tcp=2222:10.0.2.15:22"
             echo 'expect ">>>" send "boot dua0\r"; go'
             echo "boot cpu"
@@ -416,9 +416,9 @@ jobs:
         run: |
           version="${github_ref_name#v}"
 
-          # Ship only the distributable image: the compressed RAW for vax
-          # (not the 1.5 GB raw .img or console logs), the qcow2 otherwise.
-          artifacts="${{ matrix.architecture.name == 'vax' && 'output/*.img.zst' || 'output/*.qcow2' }}"
+          # One artifact per architecture now: the bundle holds the disk and,
+          # where a release publishes one, the microvm kernel (see build.sh).
+          artifacts="output/*.tar.zst"
 
           # Matrix jobs run in parallel; the first to arrive creates the
           # draft release, the rest upload their artifacts to it.

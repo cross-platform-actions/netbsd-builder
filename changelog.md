@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- Publish the kernel for QEMU's `microvm` machine type inside the image bundle,
+    where a NetBSD release provides one
 - The `runner` user can log in over SSH without a credential on every
     architecture, not just VAX, which lets a consumer stop building the FAT
     resources disk that carries a generated key
@@ -13,6 +15,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     timestamped line to the console as each `rc.d` script starts
 
 ### Changed
+- Distribute every image as a bundle, `netbsd-<version>-<architecture>.tar.zst`,
+    holding a RAW `disk.img` and, where the release has one, a `kernel`. qcow2 is
+    gone: its own compression has to keep the image writable, so it compresses
+    worse than a solid stream, and the consumer pays that on every job. The 11.0
+    x86-64 image goes from 497 MiB to 268 MiB
+    ([action#151](https://github.com/cross-platform-actions/action/issues/151))
+- Turn the image's zero ranges into holes before archiving it. The image comes
+    out of the builder fully allocated, and `tar --sparse` asks the file system
+    where the holes are rather than looking for zeroes itself, so without this
+    the archive carries all 12 GB and the consumer writes all 12 GB back out
+    when it unpacks: 47 seconds, against the 4 that converting the qcow2 took
 - Freeze the address the hypervisor hands out into the static network
     configuration and disable the DHCP client, taking it off the boot path to
     `sshd`
