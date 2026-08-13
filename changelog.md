@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Removed
+- The `rc.local` hook that mounted the consumer's FAT resources disk and
+    installed the SSH key from it. The passwordless login replaces it
+
 ### Added
 - Publish the kernel for QEMU's `microvm` machine type inside the image bundle,
     where a NetBSD release provides one

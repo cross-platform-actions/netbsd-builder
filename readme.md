@@ -174,10 +174,10 @@ That includes generating the SSH host keys on the build host and installing
 them into the image, which would otherwise cost around 20 minutes of RSA
 key generation at the emulated VAX's ~1 MIPS on the first boot.
 
-The FAT resources disk that delivers a generated SSH key to the other ports
-can't be mounted on NetBSD/VAX (`msdosfs` is unavailable there), which is why the
-passwordless login described above exists. Every architecture now accepts it, so
-the resources disk is no longer the only way in.
+The passwordless login described above started with VAX, which can't mount the
+FAT disk the consumer used to deliver a generated SSH key on (`msdosfs` is
+unavailable there). Every architecture accepts it now, so there is no key and no
+disk to carry one.
 
 ## Contributing
 

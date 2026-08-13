@@ -213,41 +213,18 @@ configure_boot_timestamps() {
   rm -f /tmp/rc.timestamps
 }
 
-# The resources disk and the key it carries are still how the action logs in.
-# Once it stops delivering one (the image now accepts a passwordless login, see
-# setup_passwordless_login) both this hook and the msdosfs dependency it brings
-# can go away.
+# The consumer used to deliver a generated SSH key on a FAT disk, mounted here.
+# It logs in without a credential now (setup_passwordless_login), so all that is
+# left of this hook is the resolver restore.
 configure_boot_scripts() {
   cat <<EOF >> /etc/rc.local
-RESOURCES_MOUNT_PATH='/mnt/resources'
 RESOLV_BACKUP='$RESOLV_BACKUP'
 
 restore_resolv_conf() {
   [ -s /etc/resolv.conf ] || cp "\$RESOLV_BACKUP" /etc/resolv.conf
 }
 
-mount_resources_disk() {
-  # get the last disk
-  disk="/dev/\$(sysctl -n hw.disknames | grep -o '[^ ]*$')"
-
-  if [ -n "\$disk" ]; then
-    mkdir -p "\$RESOURCES_MOUNT_PATH"
-    mount_msdos "\$disk" "\$RESOURCES_MOUNT_PATH"
-  fi
-}
-
-install_authorized_keys() {
-  if [ -s "\$RESOURCES_MOUNT_PATH/KEYS" ]; then
-    mkdir -p "/home/$SECONDARY_USER/.ssh"
-    cp "\$RESOURCES_MOUNT_PATH/KEYS" "/home/$SECONDARY_USER/.ssh/authorized_keys"
-    chown "$SECONDARY_USER" "/home/$SECONDARY_USER/.ssh/authorized_keys"
-    chmod 600 "/home/$SECONDARY_USER/.ssh/authorized_keys"
-  fi
-}
-
 restore_resolv_conf
-mount_resources_disk
-install_authorized_keys
 EOF
 }
 
