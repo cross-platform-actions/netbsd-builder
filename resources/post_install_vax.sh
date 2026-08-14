@@ -19,6 +19,7 @@
 #     (no msdosfs on vax), so a key is not an option.
 #   - Enable sshd at boot
 #   - Set boot loader timeout to 0
+#   - Bound the boot-time ntpdate, which the VAX needs and cannot let hang
 #   - Set the hostname
 #   - Minimize the disk image (zero unused blocks so zstd compresses it well)
 #
@@ -119,6 +120,40 @@ configure_boot_flags() {
   fi
 }
 
+# ntpdate's rc.d script runs ntpdate(8) inline, so everything after it in the
+# boot sequence -- sshd included -- waits for it to return.
+#
+# The QEMU ports simply switch it off (configure_time_sync in
+# resources/provision.sh): QEMU seeds the emulated RTC from the host clock, so
+# the offset it would correct is already ~0. That reasoning does not carry over
+# here. SIMH's KA655 has no battery-backed clock to seed, the kernel rejects
+# what it reads ("preposterous TOD clock time") and falls back to the file
+# system time, so a VAX guest that never runs ntpdate boots years in the past
+# and every HTTPS fetch fails on certificate validity instead.
+#
+# So keep it, but stop it being able to hang the boot. Two things in its path
+# can block indefinitely, and neither is bounded by ntpdate's own retries:
+#
+#   1. Resolving the pool names in the stock /etc/ntp.conf, which is what the
+#      rc.d script falls back to when ntpdate_hosts is empty. A DNS lookup that
+#      goes unanswered has no deadline here at all -- this is what wedged the
+#      guest at "Setting date via ntp." for an hour in CI. ntpdate_hosts takes
+#      precedence over ntp.conf, so numeric addresses keep DNS off the boot
+#      path entirely.
+#   2. A server that accepts the query and never answers. -t bounds each one,
+#      giving a worst case of a few seconds per address rather than forever.
+#
+# Cloudflare's time service is used because its addresses are anycast and
+# documented as stable, which a pool member's address is not. ntpd still runs
+# afterwards and corrects drift over the life of the VM, so these addresses
+# only have to be good enough for the initial step.
+configure_time_sync() {
+  cat <<'EOF' >> /mnt/etc/rc.conf
+ntpdate_hosts="162.159.200.1 162.159.200.123"
+ntpdate_flags="-t 5"
+EOF
+}
+
 set_hostname() {
   echo "hostname=${HOSTNAME}" >> /mnt/etc/rc.conf
 }
@@ -179,6 +214,7 @@ configure_ssh
 setup_passwordless_login
 enable_sshd_at_boot
 configure_boot_flags
+configure_time_sync
 set_hostname
 install_packages
 setup_sudo
