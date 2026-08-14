@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     lookup that went unanswered left the guest sitting at `Setting date via
     ntp.` It is now given numeric addresses, keeping DNS off the boot path, and
     a per-query timeout
+- Bound the VAX image test's wait for `sshd` on the clock. It counted attempts
+    instead, and an attempt costs nothing against a closed port but a whole
+    `ConnectTimeout` against a guest that stalls after accepting, so the
+    intended hour was really anywhere up to four. One stalled guest held a
+    runner for over two hours
 
 ## [0.7.0] - 2026-08-09
 ### Added

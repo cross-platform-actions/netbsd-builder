@@ -305,14 +305,22 @@ jobs:
               -o ConnectTimeout=60 runner@127.0.0.1 "$@"
           }
 
-          # The host keys are pre-generated into the image, but booting
-          # an emulated VAX to sshd still takes ~15 minutes — and a loaded
-          # CI runner (or a boot that falls back to regenerating a host key)
-          # can push well past that, so poll for up to ~60 minutes. Attempts
-          # while the port is still closed fail instantly via slirp's RST, so
-          # a generous cap doesn't slow the common case.
+          # The host keys are pre-generated into the image, so a healthy guest
+          # reaches sshd in a couple of minutes. A loaded CI runner, or a boot
+          # that falls back to regenerating a host key, can take considerably
+          # longer, so poll for an hour, plus whatever the attempt in flight
+          # when the deadline passes still costs.
+          #
+          # Bounded on the clock rather than by counting attempts, because an
+          # attempt does not cost a fixed amount of time. One against a closed
+          # port fails instantly via slirp's RST, but one against a guest that
+          # accepts the connection and then stalls costs the whole
+          # ConnectTimeout, so `180` attempts spaced by `sleep 20` is an hour
+          # only in the first case and nearly four in the second. A guest that
+          # stalled mid-boot held a runner for over two hours that way.
+          deadline=$(($(date +%s) + 3600))
           ok=
-          for _ in $(seq 1 180); do
+          while [ "$(date +%s)" -lt "$deadline" ]; do
             if ssh_vax true 2>/dev/null; then ok=1; break; fi
             sleep 20
           done
