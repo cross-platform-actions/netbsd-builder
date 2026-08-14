@@ -5,6 +5,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Fixed
+- Stop the boot-time `ntpdate` being able to stall a NetBSD/VAX guest
+    indefinitely. It runs inline in the boot sequence, ahead of `sshd`, and the
+    DNS lookup for the pool names in the stock `ntp.conf` has no deadline, so a
+    lookup that went unanswered left the guest sitting at `Setting date via
+    ntp.` It is now given numeric addresses, keeping DNS off the boot path, and
+    a per-query timeout
 
 ## [0.7.0] - 2026-08-09
 ### Added
