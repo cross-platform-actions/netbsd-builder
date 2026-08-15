@@ -198,9 +198,13 @@ jobs:
           date -u +%s > host_epoch.txt
 
       # qemu architectures are booted by cross-platform-actions/action.
+      #
+      # Pinned to the branch that can read the bundle rather than master, which
+      # still builds a .qcow2 URL. Change back to master once action#162 has
+      # merged.
       - name: Test Image
         if: matrix.architecture.name != 'vax'
-        uses: cross-platform-actions/action@master
+        uses: cross-platform-actions/action@claude/netbsd-11-microvm-kernel-wsrfrg
         with:
           operating_system: netbsd
           architecture: ${{ matrix.architecture.name }}
