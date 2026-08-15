@@ -281,7 +281,21 @@ jobs:
             ifconfig -l
             netstat -rn -f inet | grep -q '^default'
             grep -q '^nameserver' /etc/resolv.conf
-            curl -fsS -o /dev/null https://github.com
+
+            # HTTPS is attempted everywhere, but only 10 and later can pass it:
+            # certctl(8), which populates the system CA store, arrived in
+            # NetBSD 10, so on 9.x this fails on trust rather than on
+            # connectivity, which is not what is being asserted here. Tolerate
+            # that only there -- the uname test keeps a broken CA store on a
+            # release that has one from passing quietly. The clock is checked
+            # against the host's below in either case.
+            if curl -fsS -o /dev/null https://github.com; then
+              echo 'https: ok'
+            else
+              echo 'https: no CA store, asserting plain http instead'
+              [ "$(uname -r | cut -d. -f1)" -lt 10 ]
+              curl -fsS -o /dev/null http://github.com
+            fi
 
             # Duplicate address detection is off, so the address is usable as
             # soon as it is configured and rc doesn't wait for it. Assert the
