@@ -59,6 +59,94 @@ download_install_media() {
 
 download_install_media || true
 
+# Turn the image's zero ranges into holes, which is what makes `tar --sparse`
+# worth asking for: tar uses SEEK_HOLE rather than looking for zeroes itself,
+# and the image arrives from the builder fully allocated, so it finds none and
+# archives all 12 GB. Digging first takes both ends down to the ~700 MB the
+# installation uses.
+#
+# `fallocate` is Linux-only and works in place. Elsewhere a raw-to-raw qemu-img
+# conversion skips the zero blocks and so writes a sparse file.
+sparsify() {
+  image="$1"
+
+  if command -v fallocate > /dev/null 2>&1; then
+    fallocate --dig-holes "$image"
+  else
+    qemu-img convert -f raw -O raw "$image" "$image.sparse"
+    mv "$image.sparse" "$image"
+  fi
+
+  echo "image: $(du -h "$image" | cut -f1) on disk, \
+$(ls -l "$image" | awk '{print $5}') bytes virtual"
+}
+
+# One artifact per image, holding a RAW `disk.img` and, where the release has
+# one, a `kernel`. The members are named generically so a consumer needs one
+# code path per platform. -19 --long=27 is the knee of the size/speed curve, and
+# a 128 MiB window is zstd's default decompression limit, so the consumer needs
+# no --long to unpack.
+bundle_image() {
+  raw="output/netbsd-$OS_VERSION-$ARCHITECTURE.img"
+  bundle="output/netbsd-$OS_VERSION-$ARCHITECTURE.tar.zst"
+
+  # Staged inside output/ so that renaming a 12 GB file stays a rename rather
+  # than becoming a copy onto another file system.
+  rm -rf output/bundle
+  mkdir -p output/bundle
+  mv "$raw" output/bundle/disk.img
+
+  members='disk.img'
+
+  if [ -f output/kernel ]; then
+    mv output/kernel output/bundle/kernel
+    members="$members kernel"
+  fi
+
+  sparsify output/bundle/disk.img
+
+  # shellcheck disable=SC2086
+  tar --sparse -C output/bundle -cf - $members \
+    | zstd -19 --long=27 -T0 -o "$bundle" -f
+
+  rm -rf output/bundle
+  ls -l "$bundle"
+}
+
+# The kernel for QEMU's `microvm` machine type. It goes beside the disk rather
+# than inside the image, because that machine type cannot boot from a disk: the
+# consumer passes it to QEMU with `-kernel`.
+#
+# Only releases with the MICROVM configuration publish one, so a release without
+# it is not an error. The archive mirror is tried second, as older releases move
+# there.
+download_microvm_kernel() {
+  [ "$ARCHITECTURE" = 'x86-64' ] || return 0
+
+  image_architecture=$(awk -F'"' '/^ *image *=/ { print $2 }' \
+    "var_files/$ARCHITECTURE.pkrvars.hcl")
+  target=output/kernel
+  mkdir -p output
+
+  for base in \
+    "https://cdn.netbsd.org/pub/NetBSD/NetBSD-$OS_VERSION" \
+    "https://archive.netbsd.org/pub/NetBSD-archive/NetBSD-$OS_VERSION"
+  do
+    url="$base/$image_architecture/binary/kernel/netbsd-MICROVM.gz"
+    echo "microvm kernel: trying $url"
+    rm -f /tmp/microvm-kernel.gz
+    curl -fL --connect-timeout 30 -o /tmp/microvm-kernel.gz "$url" || continue
+
+    gunzip -c /tmp/microvm-kernel.gz > "$target"
+    echo "microvm kernel: obtained from $url"
+    ls -l "$target"
+    return 0
+  done
+
+  echo "microvm kernel: NetBSD $OS_VERSION publishes none"
+  return 1
+}
+
 # NetBSD/VAX is built by the SIMH plugin from a separate template. It
 # shares var_files/common.pkrvars.hcl (the user/password identity) with
 # the qemu builds, but not the qemu-specific layers — the VAX template
@@ -108,16 +196,10 @@ if [ "$ARCHITECTURE" = "vax" ]; then
     "$@" \
     netbsd-vax.pkr.hcl
 
-  # Compress the RAW disk image for distribution. The qemu architectures
-  # get compression for free from qcow2; the SIMH RAW image does not, so
-  # we zstd it here. Build time is irrelevant, so compress hard: -19
-  # --long=27 is the knee of the size/speed curve (~90 MB from ~1.5 GB)
-  # and a 128 MiB window is exactly zstd's default decompression limit,
-  # so the consumer needs no --long flag to `zstd -d`. The consumer
-  # stream-decompresses back to RAW (least runtime overhead under SIMH):
-  #   curl -sL <url>/netbsd-<ver>-vax.img.zst | zstd -dc > disk.raw
-  image="output/netbsd-${OS_VERSION}-vax.img"
-  zstd -19 --long=27 -f "$image" -o "$image.zst"
+  # Same bundle as the qemu architectures, so the consumer has one code path.
+  # SIMH attaches RAW with the least runtime overhead, so the image here is RAW
+  # to begin with; there is no microvm kernel for vax.
+  bundle_image
 else
   packer init netbsd.pkr.hcl
 
@@ -129,4 +211,8 @@ else
     -var-file "var_files/$OS_VERSION/common.pkrvars.hcl" \
     "$@" \
     netbsd.pkr.hcl
+
+  # Before bundling: the kernel is a member of the bundle, not its own artifact.
+  download_microvm_kernel || true
+  bundle_image
 fi

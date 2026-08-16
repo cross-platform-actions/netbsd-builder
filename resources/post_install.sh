@@ -4,9 +4,13 @@ set -eux
 set -o pipefail
 
 configure_ssh() {
+  # PermitEmptyPasswords is the first of the two gates the empty password of
+  # the secondary user has to pass; see setup_passwordless_login in
+  # provision.sh.
   cat <<EOF >> /mnt/etc/ssh/sshd_config
 PermitRootLogin yes
 PasswordAuthentication yes
+PermitEmptyPasswords yes
 PubkeyAuthentication yes
 UseDNS no
 AcceptEnv *

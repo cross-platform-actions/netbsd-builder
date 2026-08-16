@@ -43,6 +43,38 @@ Except for the root user, there's one additional user, `runner`, which is the
 user that will be running the commands in the GitHub action. This user is
 allowed use `sudo` without a password.
 
+`runner` also has an empty password, which `sshd` and the PAM stack are
+configured to accept, so the image can be logged into over SSH without a
+credential and without a prompt. Only `runner` is passwordless; `root` keeps the
+password set during installation.
+
+## Boot Time
+
+The images are configured to reach a reachable `sshd` as quickly as possible,
+because a consumer waits for that on every job:
+
+* The address the hypervisor hands out is frozen into the static network
+  configuration at build time and the DHCP client is disabled. Under QEMU's user
+  mode networking the lease never changes, and `dhcpcd` is ordered before the
+  `NETWORKING` milestone, which is on the path to `sshd`.
+* `ntpdate` is not run at boot. Its `rc.d` script runs `ntpdate(8)` inline, so
+  the whole boot waits for its network round trips, and it corrects an offset
+  that is already close to zero: the hypervisor seeds the emulated RTC from the
+  host clock, and the kernel reads it as UTC. `ntpd` stays enabled, with `-g` so
+  it can step a large initial offset if one ever exists.
+* Duplicate address detection is off (`net.inet.ip.dad_count=0`,
+  `net.inet6.ip6.dad_count=0`), and `/etc/rc.d/network` doesn't wait for it
+  (`ifconfig_wait_dad_flags=""`). An address is unusable while it is being
+  probed, so the kernel drops everything addressed to it and `sshd` answers
+  nothing even though it is already listening -- which is what gated a job
+  starting. NetBSD probes for IPv4 too (RFC 5227) and the schedule takes several
+  seconds. There is nothing to find: the address comes from the hypervisor's own
+  user mode network, with exactly one guest on it.
+
+Building with `-var boot_timestamps=true` makes `/etc/rc` print a timestamped
+line to the console as each `rc.d` script starts, which attributes the boot time
+to individual scripts. The same lines are logged to `/var/run/rc.log`.
+
 ## Architectures and Versions
 
 The following architectures and versions are supported:
@@ -90,8 +122,7 @@ For the VAX architecture, which is built by [SIMH] instead of QEMU:
     architectures available in the above table.
 
 The above command will build the VM image and the resulting disk image will be
-at the path: `output/netbsd-9.2-x86-64.qcow2`. For VAX the artifact is the
-compressed RAW image instead: `output/netbsd-<version>-vax.img.zst`.
+at the path: `output/netbsd-<version>-<architecture>.tar.zst`.
 
 ## Additional Information
 
@@ -102,17 +133,35 @@ image uses the serial port by default, since the QEMU `virt` machine has no
 display device at all. The VAX has a single console, the one SIMH itself
 drives, so its boot output is captured without any extra configuration.
 
-The qcow2 format is chosen because unused space doesn't take up any space on
-disk, it's compressible and easily converts the raw format.
+Every image is distributed as a single artifact,
+`netbsd-<version>-<architecture>.tar.zst`, holding:
 
-The VAX image is a RAW disk, the format SIMH attaches with the least runtime
-overhead, so it gets none of qcow2's compression. It's compressed with zstd for
-distribution instead, which brings the 1.5 GB RA92 disk down to roughly 90 MB.
-The window size is kept at zstd's default decompression limit, so no extra
-flags are needed to decompress it:
+* `disk.img`, the RAW disk. Every builder is asked for RAW directly, so nothing
+  has to be converted afterwards. qcow2 is not used: its own compression has to
+  keep the image writable, so it compresses worse than a solid stream does, and a
+  consumer pays that difference on every job. The measured numbers are in
+  [action#151](https://github.com/cross-platform-actions/action/issues/151).
+* `kernel`, where the release publishes one for QEMU's `microvm` machine type.
+  That machine type has no way to boot from a disk -- the consumer hands the
+  kernel to QEMU with `-kernel` -- so it can't live inside the image. Keeping it
+  in the same artifact means the kernel and the userland it has to match can
+  never disagree, and lets a consumer decide whether it can boot the fast way by
+  looking at what it unpacked.
+
+The members are named generically rather than after NetBSD or the version, so
+that a consumer needs one code path for every platform that ships an image this
+way.
+
+The image's zero ranges are turned into actual holes before it is archived, and
+the tar records those holes rather than the zeroes in them, so neither end has to
+read or write the full 12 GB -- only the ~700 MB the installation uses. That
+matters most to the consumer, which writes the image out on every job: without
+it, unpacking took 47 seconds against the 4 the qcow2 conversion needed. The
+compression window is kept at zstd's default decompression limit, so no extra
+flags are needed to unpack it:
 
 ```
-curl -sL <url>/netbsd-<version>-vax.img.zst | zstd -dc > disk.raw
+curl -sL <url>/netbsd-<version>-<architecture>.tar.zst | zstd -dc | tar -x
 ```
 
 The VAX image is also provisioned differently. The KA655 firmware's self-test
@@ -125,12 +174,10 @@ That includes generating the SSH host keys on the build host and installing
 them into the image, which would otherwise cost around 20 minutes of RSA
 key generation at the emulated VAX's ~1 MIPS on the first boot.
 
-Since the FAT resources disk that delivers the SSH key to every other port
-can't be mounted on NetBSD/VAX (`msdosfs` is unavailable there), the VAX image
-is logged into without a key. The `runner` user has an empty password, and both
-`sshd` and the PAM stack are configured to accept it, so the login needs no
-credential and not even a prompt. Only `runner` is passwordless; `root` keeps
-the password set during installation.
+The passwordless login described above started with VAX, which can't mount the
+FAT disk the consumer used to deliver a generated SSH key on (`msdosfs` is
+unavailable there). Every architecture accepts it now, so there is no key and no
+disk to carry one.
 
 ## Contributing
 
