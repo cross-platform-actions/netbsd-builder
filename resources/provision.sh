@@ -53,6 +53,34 @@ EOF
   /etc/rc.d/sshd restart
 }
 
+# packer connects the moment sshd lets the secondary user in, which on a
+# pre-built image is the moment creds_msdos(8) creates them -- rc is still
+# running behind that, and certctl(8) populates the TLS trust anchors from near
+# the end of it. Everything below that fetches ends up on HTTPS, because the
+# mirrors redirect there, so starting before the anchors are in place fails on
+# `certificate verify failed` rather than on anything real.
+#
+# certctl installs the single-file bundle last, with a rename, so its presence
+# means the whole store is there. Waiting for it rather than running `certctl
+# rehash` here keeps two rehashes from writing the directory at once, and costs
+# nothing on an image whose rc got there first.
+wait_for_trust_anchors() {
+  # The releases before certctl(8) have no store to wait for.
+  [ -x /usr/sbin/certctl ] || return 0
+
+  waited=0
+
+  while [ ! -f /etc/openssl/certs/ca-certificates.crt ]; do
+    if [ "$waited" -ge 600 ]; then
+      echo 'certctl never installed the TLS trust anchors'
+      return 1
+    fi
+
+    sleep 5
+    waited=$((waited + 5))
+  done
+}
+
 # sysinst installs pkgin as part of the installation. A pre-built image, which
 # is not installed through sysinst, needs it bootstrapped first. A port whose
 # official mirrors carry no prebuilt pkgsrc binaries has nothing to bootstrap
@@ -311,5 +339,6 @@ setup_passwordless_login
 configure_boot_scripts
 set_hostname
 
+wait_for_trust_anchors
 install_extra_packages
 setup_sudo

@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Turn off the NetBSD 11 heartbeat watchdog, which panics an emulated guest that
   is merely slow
+- Wait for the TLS trust anchors before installing the packages, which the
+  pre-built RISC-V 64 image could otherwise race
 
 ## [1.0.0] - 2026-08-17
 ### Removed
