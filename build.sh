@@ -287,11 +287,29 @@ bundle_image() {
   sparsify output/bundle/disk.img
 
   # shellcheck disable=SC2086
-  tar --sparse -C output/bundle -cf - $members \
+  tar $(tar_sparse_flag) -C output/bundle -cf - $members \
     | zstd -19 --long=27 -T0 -o "$bundle" -f
+
+  # `set -e` does not see a command that fails on the left of a pipe, and zstd
+  # compresses an empty stream into a perfectly valid 13 byte archive, so a tar
+  # that refused to run leaves a successful build behind an empty bundle. Assert
+  # the members are in there instead of trusting the exit status.
+  # shellcheck disable=SC2086
+  for member in $members; do
+    zstd -dc "$bundle" | tar -tf - | grep -qx "$member"
+  done
 
   rm -rf output/bundle
   ls -l "$bundle"
+}
+
+# GNU tar stores a sparse file compactly only when asked. bsdtar, which is the
+# tar on macOS, has no such option and needs none: it finds the holes itself.
+# Asking it anyway is fatal rather than ignored.
+tar_sparse_flag() {
+  if tar --sparse -cf /dev/null -T /dev/null > /dev/null 2>&1; then
+    echo '--sparse'
+  fi
 }
 
 # The kernel for QEMU's `microvm` machine type. It goes beside the disk rather

@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is merely slow
 - Wait for the TLS trust anchors before installing the packages, which the
   pre-built RISC-V 64 image could otherwise race
+- Bundle the image on a host whose `tar` is not GNU tar, and fail the build when
+  the bundle comes out empty instead of publishing it
 
 ## [1.0.0] - 2026-08-17
 ### Removed
