@@ -102,8 +102,12 @@ configure_network() {
 
   # An empty value here would ship an image that never becomes reachable, and
   # the only symptom would be the consumer's SSH timing out half an hour later.
-  # Fail the build while the reason is still on screen.
-  [ -n "$interface" ] && [ -n "$gateway" ] && [ -n "$address" ]
+  # Fail the build while the reason is still on screen. One test per line:
+  # `set -e` ignores a failing command anywhere but the end of an `&&` list, so
+  # a chained guard would let the first two through however empty they are.
+  [ -n "$interface" ]
+  [ -n "$gateway" ]
+  [ -n "$address" ]
   [ -n "$nameservers" ]
 
   # rc.conf rather than /etc/ifconfig.<if>: the variable wins over the file, and
