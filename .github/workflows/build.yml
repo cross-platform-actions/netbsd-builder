@@ -204,13 +204,9 @@ jobs:
           date -u +%s > host_epoch.txt
 
       # qemu architectures are booted by cross-platform-actions/action.
-      #
-      # Pinned to the branch that adds NetBSD 9.5 there, so the new version is
-      # verified against the action revision that will ship support for it.
-      # Change back to master once that branch has merged.
       - name: Test Image
         if: matrix.architecture.name != 'vax'
-        uses: cross-platform-actions/action@claude/netbsd-9-5-support
+        uses: cross-platform-actions/action@master
         with:
           operating_system: netbsd
           architecture: ${{ matrix.architecture.name }}
