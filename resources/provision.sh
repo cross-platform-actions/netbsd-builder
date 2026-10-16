@@ -12,16 +12,71 @@ setup_path() {
 }
 
 # Where sysinst could not install pkgin itself, because pkgsrc publishes no
-# package set for the release and the repository sysinst derives from the
-# release version is a 404. The build abandons that step there (see
+# package set for the release on its CDN and the repository sysinst derives from
+# the release version is a 404. The build abandons that step there (see
 # `pkgin_install_steps`), so pkgin is added here from the repository the build
 # was pointed at, which is the same one configure_package_repository then hands
-# to pkgin. `pkg_add` has no configuration to read a repository from -- that is
-# what pkgin's own repositories.conf is -- so it has to be given one.
+# to pkgin.
+#
+# The packages are fetched into a local directory and installed from there,
+# rather than by pointing `pkg_add` at the repository's URL. Given a URL,
+# `pkg_add` resolves a name, and every dependency, by downloading the
+# repository's HTML directory listing and globbing it, and the libfetch in 9.2
+# and 9.3 fails to read the 3.5 MB listing the pkgsrc archive serves, reporting
+# only "Unknown HTTP error". Fetching named files works everywhere, and pkg_add
+# globs a local directory with the filesystem.
 install_pkgin() {
   command -v pkgin > /dev/null 2>&1 && return 0
 
-  PKG_PATH="$PACKAGE_REPOSITORY" pkg_add -U pkgin
+  packages=$(mktemp -d)
+  ftp -V -o "$packages/pkg_summary.gz" "$PACKAGE_REPOSITORY/pkg_summary.gz"
+
+  for file in $(gzip -dc "$packages/pkg_summary.gz" | pkgin_package_files); do
+    ftp -V -o "$packages/$file" "$PACKAGE_REPOSITORY/$file"
+  done
+
+  PKG_PATH="$packages" pkg_add pkgin
+  rm -rf "$packages"
+}
+
+# Prints the file names of pkgin and of every package it depends on, read from
+# the pkg_summary on stdin. A dependency is resolved by its package name alone,
+# ignoring the version it asks for: a quarterly branch carries one version of
+# each package, which is the one its other packages were built against.
+pkgin_package_files() {
+  awk -v RS= -F '\n' '
+    {
+      name = ""; file = ""; deps = ""
+      for (i = 1; i <= NF; i++) {
+        eq = index($i, "=")
+        key = substr($i, 1, eq - 1)
+        value = substr($i, eq + 1)
+        if (key == "PKGNAME") name = value
+        else if (key == "FILE_NAME") file = value
+        else if (key == "DEPENDS") deps = deps " " package_name(value)
+      }
+      base = name
+      sub(/-[^-]*$/, "", base)
+      files[base] = file != "" ? file : name ".tgz"
+      depends[base] = deps
+    }
+
+    function package_name(pattern) {
+      sub(/[<>=].*$/, "", pattern)
+      sub(/-[[0-9].*$/, "", pattern)
+      return pattern
+    }
+
+    function visit(base,   count, list, i) {
+      if (base in seen) return
+      seen[base] = 1
+      count = split(depends[base], list, " ")
+      for (i = 1; i <= count; i++) visit(list[i])
+      if (base in files) print files[base]
+    }
+
+    END { visit("pkgin") }
+  '
 }
 
 # The repository the installer configures is the one for the release, which
