@@ -29,6 +29,7 @@ jobs:
             - 9.5
             - '10.0'
             - '10.1'
+            - '10.2'
             - '11.0'
 
           architecture:
@@ -46,6 +47,11 @@ jobs:
           # version that has a vax var file.
           include:
             - version: '10.1'
+              architecture:
+                name: vax
+                uname: vax
+
+            - version: '10.2'
               architecture:
                 name: vax
                 uname: vax
