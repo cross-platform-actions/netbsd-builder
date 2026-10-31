@@ -105,9 +105,13 @@ bundle_image() {
 
   sparsify output/bundle/disk.img
 
+  # GNU tar, as BSD tar has no --sparse. Through a file rather than a pipe, so
+  # a failing tar stops the script before the image is deleted below.
+  tar_command=$(command -v gtar || echo tar)
+
   # shellcheck disable=SC2086
-  tar --sparse -C output/bundle -cf - $members \
-    | zstd -19 --long=27 -T0 -o "$bundle" -f
+  "$tar_command" --sparse -C output/bundle -cf output/bundle.tar $members
+  zstd -19 --long=27 -T0 --rm -o "$bundle" -f output/bundle.tar
 
   rm -rf output/bundle
   ls -l "$bundle"
