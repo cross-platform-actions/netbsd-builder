@@ -163,7 +163,12 @@ jobs:
           # error, so only pass it for the qemu architectures.
           extra_args=""
           if [ '${{ matrix.architecture.name }}' != 'vax' ]; then
-            extra_args="-var headless=true"
+            # A screenshot of the guest every minute, through a QMP socket
+            # of its own: when an install stops making progress, packer only
+            # reports the timeout, and the console log rarely says more.
+            qmp_socket="$RUNNER_TEMP/qmp.sock"
+            python3 .github/scripts/capture_screens.py "$qmp_socket" "$RUNNER_TEMP/screens" &
+            extra_args="-var headless=true -var qmp_socket=$qmp_socket"
           fi
           PACKER_LOG=1 ./build.sh \
             '${{ matrix.version }}' \
@@ -219,6 +224,14 @@ jobs:
             console.log
             output/*.console.log
             output/*.console.tee.log
+          if-no-files-found: warn
+
+      - name: Upload the guest screenshots
+        if: failure() && matrix.architecture.name != 'vax'
+        uses: actions/upload-artifact@v4
+        with:
+          name: screens-${{ matrix.version }}-${{ matrix.architecture.name }}
+          path: ${{ runner.temp }}/screens
           if-no-files-found: warn
 
       - name: Start Local HTTP Server
