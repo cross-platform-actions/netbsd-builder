@@ -34,8 +34,7 @@ jobs:
 
           architecture:
             - name: x86-64
-              qemu: x86
-              qemu_executable: x86_64
+              qemu: x86_64
               uname: amd64
 
             - name: arm64
@@ -65,22 +64,18 @@ jobs:
             - version: 9.2
               architecture:
                 name: arm64
-                qemu: aarch64
 
             - version: 9.3
               architecture:
                 name: arm64
-                qemu: aarch64
 
             - version: 9.4
               architecture:
                 name: arm64
-                qemu: aarch64
 
             - version: 9.5
               architecture:
                 name: arm64
-                qemu: aarch64
 
     steps:
       - name: Clone Repository
@@ -93,13 +88,16 @@ jobs:
           sudo apt update
           sudo apt install -y fdisk dosfstools rsync curl python3 zstd
 
-          # qemu only for the qemu-backed architectures; vax uses SIMH.
+          # QEMU from Homebrew rather than Ubuntu, whose 8.2 is far behind the
+          # QEMU the images are run on. Only the programs packer runs are
+          # linked onto PATH, so the rest of Homebrew doesn't shadow the
+          # system tools. VAX uses SIMH instead.
           if [ -n '${{ matrix.architecture.qemu }}' ]; then
-            sudo apt install -y qemu-system-${{ matrix.architecture.qemu }}
-
-            if [ -f /usr/share/qemu-efi-aarch64/QEMU_EFI.fd ]; then
-              sudo ln -s /usr/share/qemu-efi-aarch64/QEMU_EFI.fd /usr/share/qemu/edk2-aarch64-code.fd
-            fi
+            /home/linuxbrew/.linuxbrew/bin/brew install qemu
+            sudo ln -s \
+              '/home/linuxbrew/.linuxbrew/bin/qemu-system-${{ matrix.architecture.qemu }}' \
+              /home/linuxbrew/.linuxbrew/bin/qemu-img \
+              /usr/local/bin/
           fi
 
       # The SIMH VAX simulator the plugin drives. The build runs on
@@ -114,7 +112,7 @@ jobs:
 
       - name: Print QEMU version
         if: matrix.architecture.name != 'vax'
-        run: '"qemu-system-${{ matrix.architecture.qemu_executable || matrix.architecture.qemu }}" --version'
+        run: '"qemu-system-${{ matrix.architecture.qemu }}" --version'
 
       - uses: hashicorp/setup-packer@main
         with:
