@@ -93,7 +93,11 @@ reboot_steps = [
   // the installer ramdisk, so run it via `chroot /mnt`. Retried so a slow
   // SLIRP connect under TCG can't strand QEMU. halt -p is a last resort;
   // sun4u is expected to hang in OF_exit.
-  ["sync; sync; chroot /mnt sh -c 'for i in $(seq 1 10); do printf \"quit\\n\" | nc -w10 10.0.2.2 4444 && break; sleep 3; done'; halt -p<enter><wait30s>", "Sync, quit QEMU via monitor (retry), halt -p fallback"],
+  //
+  // No wait after this step: packer only expects QEMU to exit once it is
+  // waiting for the shutdown, and fails the build if QEMU exits while a boot
+  // step is still running. The sleep gives packer time to get there.
+  ["sleep 10; sync; sync; chroot /mnt sh -c 'for i in $(seq 1 10); do printf \"quit\\n\" | nc -w10 10.0.2.2 4444 && break; sleep 3; done'; halt -p<enter>", "Sync, quit QEMU via monitor (retry), halt -p fallback"],
 ]
 
 qemuargs = [
