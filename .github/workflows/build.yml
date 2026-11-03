@@ -41,6 +41,10 @@ jobs:
               qemu: aarch64
               uname: aarch64
 
+            - name: sparc64
+              qemu: sparc64
+              uname: sparc64
+
           # NetBSD/VAX is built by the SIMH plugin, not qemu, so it can't
           # be part of the architecture list above — add one extra job per
           # version that has a vax var file.
@@ -76,6 +80,27 @@ jobs:
             - version: 9.5
               architecture:
                 name: arm64
+
+            # sparc64 is only supported on NetBSD 10.1 and later.
+            - version: 9.2
+              architecture:
+                name: sparc64
+
+            - version: 9.3
+              architecture:
+                name: sparc64
+
+            - version: 9.4
+              architecture:
+                name: sparc64
+
+            - version: 9.5
+              architecture:
+                name: sparc64
+
+            - version: '10.0'
+              architecture:
+                name: sparc64
 
     steps:
       - name: Clone Repository
@@ -208,8 +233,11 @@ jobs:
           date -u +%s > host_epoch.txt
 
       # qemu architectures are booted by cross-platform-actions/action.
+      #
+      # sparc64 is skipped too: the action's architecture enum only knows
+      # arm64/x86_64, so it can't boot the image yet.
       - name: Test Image
-        if: matrix.architecture.name != 'vax'
+        if: matrix.architecture.name != 'vax' && matrix.architecture.name != 'sparc64'
         uses: cross-platform-actions/action@master
         with:
           operating_system: netbsd
@@ -328,7 +356,7 @@ jobs:
             sudo cat /var/run/rc.log || true
 
       - name: Verify File Synchronization
-        if: matrix.architecture.name != 'vax'
+        if: matrix.architecture.name != 'vax' && matrix.architecture.name != 'sparc64'
         run: cat guest_to_host.txt | grep -q 'guest to host'
 
       # The action still logs in with a generated key, but the image accepts an
@@ -336,7 +364,7 @@ jobs:
       # the resources disk. The VM above is still up (shutdown_vm: false), so
       # assert that path directly with every other method disabled.
       - name: Test Passwordless Login
-        if: matrix.architecture.name != 'vax'
+        if: matrix.architecture.name != 'vax' && matrix.architecture.name != 'sparc64'
         run: |
           ssh -p 2847 \
             -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \

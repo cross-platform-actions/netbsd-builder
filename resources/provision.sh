@@ -7,7 +7,11 @@ set -exu
 RESOLV_BACKUP='/etc/resolv.conf.cpa'
 
 setup_path() {
-  PATH="/sbin:/usr/sbin:$PATH"
+  # /usr/pkg/bin and /usr/pkg/sbin hold pkgin and pkg_add. sparc64 runs this
+  # script inside the sysinst chroot rather than over SSH on the booted system,
+  # and the PATH it inherits there has neither, so install_pkgin would decide
+  # pkgin is missing and try to install it again from nowhere.
+  PATH="/sbin:/usr/sbin:/usr/pkg/bin:/usr/pkg/sbin:$PATH"
   export PATH
 }
 
