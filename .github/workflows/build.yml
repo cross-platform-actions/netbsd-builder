@@ -31,6 +31,7 @@ jobs:
             - '10.1'
             - '10.2'
             - '11.0'
+            - '11.1'
 
           architecture:
             - name: x86-64
@@ -60,6 +61,11 @@ jobs:
                 uname: vax
 
             - version: '11.0'
+              architecture:
+                name: vax
+                uname: vax
+
+            - version: '11.1'
               architecture:
                 name: vax
                 uname: vax

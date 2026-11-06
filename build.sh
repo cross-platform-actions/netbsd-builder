@@ -177,9 +177,10 @@ if [ "$ARCHITECTURE" = "vax" ]; then
   # VAX). Pinned to a release for reproducibility -- bump pkg_repo_version for a
   # newer set. The same version is published per NetBSD release
   # (NetBSD-<version>-vax--<pkg_repo_version>), so it must exist for every
-  # version built here -- v0.2.0 is the first one covering 10.1, 10.2 and 11.0.
+  # version built here -- v0.3.0 is the first one covering 10.1, 10.2, 11.0 and
+  # 11.1.
   pkg_repo="cross-platform-actions/netbsd-pkg-repo"
-  pkg_repo_version="v0.2.0"
+  pkg_repo_version="v0.3.0"
   pkg_repo_tag="NetBSD-${OS_VERSION}-vax--${pkg_repo_version}"
   pkg_release_url="https://github.com/${pkg_repo}/releases/download/${pkg_repo_tag}"
   rm -rf vax_packages

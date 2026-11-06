@@ -89,6 +89,7 @@ The following architectures and versions are supported:
 
 | Version | x86-64 | ARM64 | SPARC64 | VAX |
 |---------|--------|-------|---------|-----|
+| 11.1    | ✓      | ✓     | ✓       | ✓   |
 | 11.0    | ✓      | ✓     | ✓       | ✓   |
 | 10.2    | ✓      | ✓     | ✓       | ✓   |
 | 10.1    | ✓      | ✓     | ✓       | ✓   |
