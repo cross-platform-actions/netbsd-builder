@@ -148,6 +148,11 @@ jobs:
           sudo tar -xf /tmp/vax.tar -C /usr/local/bin vax
           command -v vax
 
+          # SIMH's NAT binds a UDP socket on localhost to a port taken from the
+          # clock, and retries that same port forever if the bind fails. A port
+          # below 1024 needs root, so allow unprivileged binds there.
+          sudo sysctl -w net.ipv4.ip_unprivileged_port_start=0
+
       - name: Print QEMU version
         if: matrix.architecture.name != 'vax'
         run: '"qemu-system-${{ matrix.architecture.qemu }}" --version'
